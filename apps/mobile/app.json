@@ -28,6 +28,7 @@
       "expo-router",
       "expo-apple-authentication",
       "expo-web-browser",
+      ["expo-build-properties", { "ios": { "useFrameworks": "static" } }],
       "@xmartlabs/react-native-line"
     ],
     "experiments": {
