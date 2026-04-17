@@ -1,0 +1,731 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Kyoiru — Prisma Schema
+// Wave 1: users / auth_identities / friendship_requests / friendships / user_blocks
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+/// ユーザーのプロフィール公開状態
+/// pending  = OAuth 完了直後・プロフィール未入力 (ホーム進入不可)
+/// active   = プロフィール設定完了済み
+/// deactivated = 退会・利用停止
+enum ProfileStatus {
+  pending
+  active
+  deactivated
+}
+
+/// auth プロバイダ種別 (仕様の 4 系統に対応)
+enum AuthProvider {
+  apple
+  line
+  google
+  email
+}
+
+/// 友達申請ステータス
+enum FriendRequestStatus {
+  pending
+  accepted
+  rejected
+  cancelled
+}
+
+/// ユーザー ID 検索の公開設定 (ON/OFF の 2 値)
+enum IdSearchVisibility {
+  public
+  private
+}
+
+/// グループ利用タイプ
+/// friends = 友人・恋人向け
+/// family  = 家族向け
+enum GroupType {
+  friends
+  family
+}
+
+/// グループ単位の無料通知温度感
+enum GroupNotificationLevel {
+  loose
+  normal
+  caring
+}
+
+/// 無料未反応通知の送信フェーズ
+enum FreeCheckinReminderPhase {
+  caring_21
+  normal_next_morning
+  caring_next_morning
+}
+
+/// 見守り段階通知の送信フェーズ
+enum MonitoringAlertDeliveryPhase {
+  monitor_stage_1
+  monitor_stage_2
+  monitor_stage_3
+}
+
+/// RevenueCat 由来の有料権利状態
+enum SubscriptionEntitlementStatus {
+  active
+  grace
+  expired
+}
+
+/// 見守り関係のステータス
+/// pending   = watcher が開始リクエスト送信済み・target 未応答
+/// active    = target が同意済み (見守り有効)
+/// rejected  = target が拒否
+/// cancelled = watcher がリクエストを取消
+/// revoked   = target が同意を撤回 (即停止)
+/// stopped   = 課金切れ / block 等による強制停止
+enum MonitoringRelationshipStatus {
+  pending
+  active
+  rejected
+  cancelled
+  revoked
+  stopped
+}
+
+/// GPS 共有モード
+/// off        = 共有しない
+/// on_overdue = 未反応時のみ参照可能 (初期値)
+/// always     = 常時共有
+enum GpsShareMode {
+  off
+  on_overdue
+  always
+}
+
+/// 複数回チェックイン時刻テンプレート
+/// morning            = 朝のみ (1回)
+/// morning_evening    = 朝・夜 (2回)
+/// morning_noon_evening = 朝・昼・夜 (3回)
+enum CheckinTemplate {
+  morning
+  morning_evening
+  morning_noon_evening
+}
+
+// ─────────────────────────────────────────────
+// users
+// ─────────────────────────────────────────────
+
+model User {
+  /// サロゲートキー
+  id        String   @id @default(uuid()) @db.Uuid
+
+  /// アプリ内一意の公開 ID (@kyoiru123 等)
+  /// 変更は service 層で user_id_changed_at を使って制限する
+  userId    String   @unique @map("user_id")
+
+  displayName         String             @map("display_name")
+  avatarUrl           String?            @map("avatar_url")
+  profileStatus       ProfileStatus      @default(pending) @map("profile_status")
+  idSearchVisibility  IdSearchVisibility @default(public) @map("id_search_visibility")
+
+  /// 最後に userId を変更した日時 (null = 一度も変更していない)
+  /// service 層が変更頻度制限をここで判断する
+  userIdChangedAt DateTime? @map("user_id_changed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // relations
+  authIdentities    AuthIdentity[]
+  sentRequests      FriendshipRequest[] @relation("SentRequests")
+  receivedRequests  FriendshipRequest[] @relation("ReceivedRequests")
+  friendshipsLow    Friendship[]        @relation("FriendshipsLow")
+  friendshipsHigh   Friendship[]        @relation("FriendshipsHigh")
+  blocksGiven       UserBlock[]         @relation("BlocksGiven")
+  blocksReceived    UserBlock[]         @relation("BlocksReceived")
+  createdGroups     Group[]             @relation("CreatedGroups")
+  createdFriendInviteLinks FriendInviteLink[] @relation("CreatedFriendInviteLinks")
+  createdGroupInviteLinks GroupInviteLink[] @relation("CreatedGroupInviteLinks")
+  groupMemberships  GroupMember[]
+  freeCheckinReminderDeliveries FreeCheckinReminderDelivery[]
+  dailyCheckins     DailyCheckin[]
+  dailyMoodStamps   DailyMoodStamp[]
+  subscriptionEntitlements UserSubscriptionEntitlement[]
+  revenueCatWebhookEvents RevenueCatWebhookEvent[]
+  refreshTokens     RefreshToken[]
+  pushTokens        PushToken[]
+  accountDeletionRequest AccountDeletionRequest?
+  watcherRelationships MonitoringRelationship[] @relation("WatcherRelationships")
+  targetRelationships  MonitoringRelationship[] @relation("TargetRelationships")
+  viewedEmergencyContacts MonitoringEmergencyContactView[] @relation("WatcherEmergencyContactViews")
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// auth_identities
+// ─────────────────────────────────────────────
+
+model AuthIdentity {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId   String     @map("user_id") @db.Uuid
+  provider AuthProvider
+  /// プロバイダが発行するユーザー識別子
+  /// email プロバイダの場合はメールアドレス (lowercase)
+  /// OAuth プロバイダの場合はプロバイダ発行の sub
+  providerSubject String @map("provider_subject")
+  /// email プロバイダ専用のパスワードハッシュ
+  /// OAuth プロバイダは null
+  passwordHash String? @map("password_hash")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 同一プロバイダ・同一 subject の重複登録禁止
+  @@unique([provider, providerSubject], name: "uq_auth_identities_provider_subject")
+  @@map("auth_identities")
+}
+
+// ─────────────────────────────────────────────
+// friendship_requests
+// ─────────────────────────────────────────────
+
+model FriendshipRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  senderUserId   String @map("sender_user_id") @db.Uuid
+  receiverUserId String @map("receiver_user_id") @db.Uuid
+
+  status FriendRequestStatus @default(pending)
+
+  /// 承認または拒否した日時
+  respondedAt DateTime? @map("responded_at")
+  /// 申請を取り消した日時
+  cancelledAt DateTime? @map("cancelled_at")
+  /// 拒否した日時 (service 層の 30 日再申請不可判定に使う)
+  rejectedAt  DateTime? @map("rejected_at")
+  /// 拒否取り消し可能期限 (service 層が設定・判定する)
+  rejectionRevertDeadlineAt DateTime? @map("rejection_revert_deadline_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sender   User @relation("SentRequests",     fields: [senderUserId],   references: [id])
+  receiver User @relation("ReceivedRequests", fields: [receiverUserId], references: [id])
+
+  /// pending 重複申請禁止の基礎
+  /// Prisma は部分インデックスをスキーマで直接表現できないため、
+  /// migration.sql に手動で追加済み:
+  ///   CREATE UNIQUE INDEX "uq_friendship_requests_pending"
+  ///     ON "friendship_requests"(sender_user_id, receiver_user_id)
+  ///     WHERE status = 'pending';
+  @@index([senderUserId, receiverUserId])
+  @@index([receiverUserId, status])
+  @@map("friendship_requests")
+}
+
+// ─────────────────────────────────────────────
+// friendships
+// ─────────────────────────────────────────────
+
+model Friendship {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// user_id を UUID 辞書順で低い方を low、高い方を high に正規化して格納
+  /// 双方向 2 レコードを持たず 1 レコードで 1 友達関係を表す
+  userLowId  String @map("user_low_id")  @db.Uuid
+  userHighId String @map("user_high_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userLow  User @relation("FriendshipsLow",  fields: [userLowId],  references: [id])
+  userHigh User @relation("FriendshipsHigh", fields: [userHighId], references: [id])
+
+  /// ユーザーペアの一意性 (low < high 正規化により (A,B) と (B,A) は同一レコード)
+  @@unique([userLowId, userHighId], name: "uq_friendships_pair")
+  @@map("friendships")
+}
+
+// ─────────────────────────────────────────────
+// user_blocks
+// ─────────────────────────────────────────────
+
+model UserBlock {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// block を実行したユーザー
+  blockerUserId String @map("blocker_user_id") @db.Uuid
+  /// block されたユーザー
+  blockedUserId String @map("blocked_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("BlocksGiven",    fields: [blockerUserId], references: [id])
+  blocked User @relation("BlocksReceived", fields: [blockedUserId], references: [id])
+
+  /// 同一ペア・同一方向の重複 block 禁止
+  @@unique([blockerUserId, blockedUserId], name: "uq_user_blocks_pair")
+  @@map("user_blocks")
+}
+
+// ─────────────────────────────────────────────
+// groups
+// ─────────────────────────────────────────────
+
+model Group {
+  id String @id @default(uuid()) @db.Uuid
+
+  name    String
+  type    GroupType
+  iconUrl String? @map("icon_url")
+  notificationLevel GroupNotificationLevel @default(normal) @map("notification_level")
+
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  createdBy User          @relation("CreatedGroups", fields: [createdByUserId], references: [id])
+  members   GroupMember[]
+  inviteLinks GroupInviteLink[]
+  freeCheckinReminderDeliveries FreeCheckinReminderDelivery[]
+
+  @@index([createdByUserId])
+  @@map("groups")
+}
+
+// ─────────────────────────────────────────────
+// group_members
+// ─────────────────────────────────────────────
+
+model GroupMember {
+  id String @id @default(uuid()) @db.Uuid
+
+  groupId String @map("group_id") @db.Uuid
+  userId  String @map("user_id") @db.Uuid
+
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  group Group @relation(fields: [groupId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId], name: "uq_group_members_group_user")
+  @@index([groupId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+// ─────────────────────────────────────────────
+// group_invite_links
+// ─────────────────────────────────────────────
+
+model GroupInviteLink {
+  id String @id @default(uuid()) @db.Uuid
+
+  groupId String @map("group_id") @db.Uuid
+  token   String @unique
+
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group     Group @relation(fields: [groupId], references: [id])
+  createdBy User  @relation("CreatedGroupInviteLinks", fields: [createdByUserId], references: [id])
+
+  @@index([groupId, createdAt])
+  @@index([groupId])
+  @@index([createdByUserId])
+  @@map("group_invite_links")
+}
+
+// ─────────────────────────────────────────────
+// friend_invite_links
+// ─────────────────────────────────────────────
+
+model FriendInviteLink {
+  id String @id @default(uuid()) @db.Uuid
+
+  createdByUserId String @map("created_by_user_id") @db.Uuid
+  token String @unique
+
+  expiresAt DateTime @map("expires_at")
+  usedAt DateTime? @map("used_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  createdBy User @relation("CreatedFriendInviteLinks", fields: [createdByUserId], references: [id])
+
+  @@index([createdByUserId, createdAt])
+  @@index([createdByUserId])
+  @@map("friend_invite_links")
+}
+
+// ─────────────────────────────────────────────
+// daily_checkins
+// ─────────────────────────────────────────────
+
+model DailyCheckin {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  businessDateJst String @map("business_date_jst")
+
+  checkedInAt DateTime @map("checked_in_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, businessDateJst], name: "uq_daily_checkins_user_business_date")
+  @@index([businessDateJst])
+  @@index([userId, checkedInAt])
+  @@map("daily_checkins")
+}
+
+// ─────────────────────────────────────────────
+// daily_mood_stamps
+// ─────────────────────────────────────────────
+
+model DailyMoodStamp {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  businessDateJst String @map("business_date_jst")
+
+  mood String
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, businessDateJst], name: "uq_daily_mood_stamps_user_business_date")
+  @@index([businessDateJst])
+  @@index([userId, createdAt])
+  @@map("daily_mood_stamps")
+}
+
+// ─────────────────────────────────────────────
+// free_checkin_reminder_deliveries
+// ─────────────────────────────────────────────
+
+model FreeCheckinReminderDelivery {
+  id String @id @default(uuid()) @db.Uuid
+
+  groupId String @map("group_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  businessDateJst String @map("business_date_jst")
+  phase FreeCheckinReminderPhase
+
+  sentAt DateTime @map("sent_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group Group @relation(fields: [groupId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId, businessDateJst, phase], name: "uq_free_checkin_reminder_deliveries_scope")
+  @@index([businessDateJst, phase])
+  @@index([userId, createdAt])
+  @@map("free_checkin_reminder_deliveries")
+}
+
+// ─────────────────────────────────────────────
+// user_subscription_entitlements
+// ─────────────────────────────────────────────
+
+model UserSubscriptionEntitlement {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  entitlementKey String @map("entitlement_key")
+  platform String
+  status SubscriptionEntitlementStatus
+
+  currentPeriodExpiresAt DateTime? @map("current_period_expires_at")
+  gracePeriodExpiresAt DateTime? @map("grace_period_expires_at")
+  trialEndsAt DateTime? @map("trial_ends_at")
+  hasUsedTrial Boolean @default(false) @map("has_used_trial")
+
+  sourceAppUserId String? @map("source_app_user_id")
+  lastEventId String @map("last_event_id")
+  lastEventType String @map("last_event_type")
+  lastEventTimestampAt DateTime @map("last_event_timestamp_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, entitlementKey], name: "uq_user_subscription_entitlements_user_key")
+  @@index([status, updatedAt])
+  @@map("user_subscription_entitlements")
+}
+
+// ─────────────────────────────────────────────
+// revenuecat_webhook_events
+// ─────────────────────────────────────────────
+
+model RevenueCatWebhookEvent {
+  id String @id
+
+  userId String? @map("user_id") @db.Uuid
+  appUserId String? @map("app_user_id")
+  eventType String @map("event_type")
+  entitlementKey String? @map("entitlement_key")
+  eventTimestampAt DateTime? @map("event_timestamp_at")
+  environment String?
+  payload Json
+
+  processedAt DateTime? @map("processed_at")
+  ignoredReason String? @map("ignored_reason")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([appUserId, createdAt])
+  @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+  @@map("revenuecat_webhook_events")
+}
+
+// ─────────────────────────────────────────────
+// monitoring_relationships
+// ─────────────────────────────────────────────
+
+/// 見守り関係の正本。
+/// watcher = 見守る側 (有料プラン必須)
+/// target  = 見守られる側 (無料でもよい・明示同意が必要)
+///
+/// 重複防止:
+///   (watcher_user_id, target_user_id) で pending / active が同時に 1 件のみ
+///   → migration.sql に部分ユニークインデックスで実現
+model MonitoringRelationship {
+  id String @id @default(uuid()) @db.Uuid
+
+  watcherUserId String @map("watcher_user_id") @db.Uuid
+  targetUserId  String @map("target_user_id")  @db.Uuid
+
+  status MonitoringRelationshipStatus @default(pending)
+
+  /// リクエスト送信日時
+  requestedAt DateTime  @default(now()) @map("requested_at")
+  /// target が同意または拒否した日時
+  respondedAt DateTime? @map("responded_at")
+  /// 見守りが有効になった日時 (同意時のみ設定)
+  activatedAt DateTime? @map("activated_at")
+  /// watcher がリクエストを取消した日時
+  cancelledAt DateTime? @map("cancelled_at")
+  /// target が拒否した日時
+  rejectedAt  DateTime? @map("rejected_at")
+  /// target が同意を撤回した日時
+  revokedAt   DateTime? @map("revoked_at")
+  /// 課金切れ / block 等で強制停止した日時
+  stoppedAt   DateTime? @map("stopped_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  watcher User @relation("WatcherRelationships", fields: [watcherUserId], references: [id])
+  target  User @relation("TargetRelationships",  fields: [targetUserId],  references: [id])
+
+  alertDeliveries  MonitoringAlertDelivery[]
+  settings         MonitoringSettings?
+  emergencyContact EmergencyContact?
+
+  /// 検索用インデックス
+  /// pending / active 重複禁止は migration.sql の部分ユニークインデックスで対応
+  @@index([watcherUserId, targetUserId])
+  @@index([targetUserId, status])
+  @@index([watcherUserId, status])
+  @@map("monitoring_relationships")
+}
+
+// ─────────────────────────────────────────────
+// monitoring_alert_deliveries
+// ─────────────────────────────────────────────
+
+/// 見守り段階通知の送信正本。
+/// 同一 relationship / business_date_jst / phase は 1 回のみ送信する。
+model MonitoringAlertDelivery {
+  id String @id @default(uuid()) @db.Uuid
+
+  monitoringRelationshipId String @map("monitoring_relationship_id") @db.Uuid
+  businessDateJst String @map("business_date_jst")
+  phase MonitoringAlertDeliveryPhase
+
+  sentAt DateTime @map("sent_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  monitoringRelationship MonitoringRelationship @relation(fields: [monitoringRelationshipId], references: [id])
+
+  @@unique([monitoringRelationshipId, businessDateJst, phase], name: "uq_monitoring_alert_deliveries_scope")
+  @@index([businessDateJst, phase])
+  @@index([monitoringRelationshipId, createdAt])
+  @@map("monitoring_alert_deliveries")
+}
+
+// ─────────────────────────────────────────────
+// monitoring_settings
+// ─────────────────────────────────────────────
+
+/// 見守り設定の正本。active になった時点で初期値で生成する。
+/// 1:1 (monitoring_relationship)
+/// target が更新権を持つ。更新は active 状態のみ許可。
+/// stopped 後も削除しない。再契約時に保持内容で復元可能。
+model MonitoringSettings {
+  id                       String          @id @default(uuid()) @db.Uuid
+  monitoringRelationshipId String          @unique @map("monitoring_relationship_id") @db.Uuid
+
+  /// GPS 共有モード (初期値: on_overdue)
+  gpsShareMode             GpsShareMode    @default(on_overdue) @map("gps_share_mode")
+  /// 1日のチェックイン回数 (1 / 2 / 3)
+  checkinFrequency         Int             @default(1) @map("checkin_frequency")
+  /// チェックイン時刻テンプレート (初期値: morning)
+  checkinTemplate          CheckinTemplate @default(morning) @map("checkin_template")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  monitoringRelationship MonitoringRelationship @relation(fields: [monitoringRelationshipId], references: [id])
+
+  @@map("monitoring_settings")
+}
+
+// ─────────────────────────────────────────────
+// emergency_contacts
+// ─────────────────────────────────────────────
+
+/// 緊急連絡先の正本。1:1 (monitoring_relationship)。
+/// target 本人が設定・更新する。1 件のみ保持。
+/// 更新は active 状態のみ許可。stopped 後も削除しない。
+model EmergencyContact {
+  id                       String  @id @default(uuid()) @db.Uuid
+  monitoringRelationshipId String  @unique @map("monitoring_relationship_id") @db.Uuid
+
+  name         String
+  phoneNumber  String  @map("phone_number")
+  /// 続柄 (任意)
+  relationship String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  monitoringRelationship MonitoringRelationship @relation(fields: [monitoringRelationshipId], references: [id])
+
+  @@map("emergency_contacts")
+}
+
+// ─────────────────────────────────────────────
+// monitoring_emergency_contact_views
+// ─────────────────────────────────────────────
+
+model MonitoringEmergencyContactView {
+  id String @id @default(uuid()) @db.Uuid
+
+  monitoringRelationshipId String @map("monitoring_relationship_id") @db.Uuid
+  watcherUserId String @map("watcher_user_id") @db.Uuid
+  /// 180 日 purge 時に target 側からも辿れるよう保持する。
+  targetUserId String @map("target_user_id") @db.Uuid
+  viewedAt DateTime @map("viewed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  watcher User @relation("WatcherEmergencyContactViews", fields: [watcherUserId], references: [id])
+
+  @@index([monitoringRelationshipId, viewedAt])
+  @@index([watcherUserId, viewedAt])
+  @@index([targetUserId, viewedAt])
+  @@map("monitoring_emergency_contact_views")
+}
+
+// ─────────────────────────────────────────────
+// refresh_tokens
+// ─────────────────────────────────────────────
+
+model RefreshToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+
+  /// raw token の SHA-256 ハッシュ。raw 値はクライアントにのみ存在する
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt DateTime  @map("expires_at")
+  /// null = 有効, non-null = 無効化済み (rotate / logout)
+  revokedAt DateTime? @map("revoked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────
+// push_tokens
+// ─────────────────────────────────────────────
+
+model PushToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  token String @unique
+  platform String
+
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("push_tokens")
+}
+
+// ─────────────────────────────────────────────
+// account_deletion_requests
+// ─────────────────────────────────────────────
+
+/// 退会実行後の即時停止と保持期限ごとの削除ジョブ進行を管理する正本。
+model AccountDeletionRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @map("user_id") @db.Uuid
+
+  requestedAt DateTime @map("requested_at")
+  immediateDisabledAt DateTime @map("immediate_disabled_at")
+
+  purge24hAfter DateTime @map("purge_24h_after")
+  purge30dAfter DateTime @map("purge_30d_after")
+  purge180dAfter DateTime @map("purge_180d_after")
+  purge7yAfter DateTime @map("purge_7y_after")
+
+  purge24hCompletedAt DateTime? @map("purge_24h_completed_at")
+  purge30dCompletedAt DateTime? @map("purge_30d_completed_at")
+  purge180dCompletedAt DateTime? @map("purge_180d_completed_at")
+  purge7yCompletedAt DateTime? @map("purge_7y_completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([purge24hAfter, purge24hCompletedAt])
+  @@index([purge30dAfter, purge30dCompletedAt])
+  @@index([purge180dAfter, purge180dCompletedAt])
+  @@index([purge7yAfter, purge7yCompletedAt])
+  @@map("account_deletion_requests")
+}

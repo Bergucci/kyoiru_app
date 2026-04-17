@@ -1,0 +1,27 @@
+{
+  "name": "kyoiru",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @kyoiru/api dev",
+    "dev:mobile": "pnpm --filter @kyoiru/mobile start",
+    "build:api": "pnpm --filter @kyoiru/api build",
+    "build:mobile:android": "pnpm --filter @kyoiru/mobile build:android",
+    "build:mobile:ios": "pnpm --filter @kyoiru/mobile build:ios",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
+    ]
+  }
+}
