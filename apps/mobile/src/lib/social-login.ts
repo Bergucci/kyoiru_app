@@ -1,9 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import LineLogin, { Scope } from '@xmartlabs/react-native-line';
 import { apiRequest } from './api';
 import type { SessionState } from '../session/session-context';
 
@@ -96,10 +96,17 @@ function isAppleCancelError(error: unknown): boolean {
   return code === 'ERR_REQUEST_CANCELED' || code === 'ERR_CANCELED';
 }
 
-const LINE_DISCOVERY: AuthSession.DiscoveryDocument = {
-  authorizationEndpoint: 'https://access.line.me/oauth2/v2.1/authorize',
-  tokenEndpoint: 'https://api.line.me/oauth2/v2.1/token',
-};
+function isLineCancelError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; message?: string };
+  const code = e.code ?? '';
+  const message = (e.message ?? '').toLowerCase();
+  return (
+    code === 'LINE_SDK_ERROR_USER_CANCEL' ||
+    message.includes('cancel') ||
+    message.includes('dismiss')
+  );
+}
 
 export interface SocialLoginController {
   loginWithApple: () => Promise<SessionState>;
@@ -135,26 +142,6 @@ export function useSocialLoginController(): SocialLoginController {
 
   const lineChannelId = process.env.EXPO_PUBLIC_LINE_CHANNEL_ID;
   const isLineConfigured = Boolean(lineChannelId);
-
-  const lineRedirectUri = useMemo(
-    () =>
-      AuthSession.makeRedirectUri({
-        scheme: 'kyoiru',
-        path: 'auth/line',
-      }),
-    [],
-  );
-
-  const [lineRequest, , promptLineAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: lineChannelId ?? '',
-      scopes: ['openid', 'profile'],
-      redirectUri: lineRedirectUri,
-      responseType: AuthSession.ResponseType.Code,
-      usePKCE: true,
-    },
-    LINE_DISCOVERY,
-  );
 
   const loginWithApple = useCallback(async () => {
     const identityToken = await acquireAppleIdentityToken();
@@ -198,44 +185,24 @@ export function useSocialLoginController(): SocialLoginController {
       );
     }
 
-    const result = await promptLineAsync();
+    await LineLogin.setup({ channelId: lineChannelId });
 
-    if (result.type === 'cancel' || result.type === 'dismiss') {
-      throw new SocialLoginCancelledError('line');
+    try {
+      const result = await LineLogin.login({ scopes: [Scope.Profile, Scope.OpenId] });
+      const accessToken = result.accessToken.accessToken;
+
+      if (!accessToken) {
+        throw new Error('LINE accessToken を取得できませんでした。');
+      }
+
+      return exchangeCredential('line', accessToken);
+    } catch (error) {
+      if (isLineCancelError(error)) {
+        throw new SocialLoginCancelledError('line');
+      }
+      throw error;
     }
-
-    if (result.type !== 'success') {
-      throw new Error('LINE 認証に失敗しました。');
-    }
-
-    const code = result.params?.code;
-    if (!code) {
-      throw new Error('LINE 認証コードを取得できませんでした。');
-    }
-
-    const codeVerifier = lineRequest?.codeVerifier;
-    if (!codeVerifier) {
-      throw new Error('LINE PKCE verifier を取得できませんでした。');
-    }
-
-    const tokenResponse = await AuthSession.exchangeCodeAsync(
-      {
-        clientId: lineChannelId,
-        code,
-        redirectUri: lineRedirectUri,
-        extraParams: {
-          code_verifier: codeVerifier,
-        },
-      },
-      LINE_DISCOVERY,
-    );
-
-    if (!tokenResponse.accessToken) {
-      throw new Error('LINE accessToken を取得できませんでした。');
-    }
-
-    return exchangeCredential('line', tokenResponse.accessToken);
-  }, [isLineConfigured, lineChannelId, lineRedirectUri, lineRequest, promptLineAsync]);
+  }, [isLineConfigured, lineChannelId]);
 
   return {
     loginWithApple,
