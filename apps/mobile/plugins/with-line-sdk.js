@@ -1,4 +1,4 @@
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withEntitlementsPlist } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
 
@@ -21,7 +21,8 @@ const PATCH_BODY = `    ${PATCH_TAG}
 `;
 
 const withLineSDK = (config) => {
-  return withDangerousMod(config, [
+  // ── 1. Podfile patch: SWIFT_VERSION=5.0 for LineSDKSwift ──────────────────
+  config = withDangerousMod(config, [
     'ios',
     (mod) => {
       const podfilePath = path.join(mod.modRequest.platformProjectRoot, 'Podfile');
@@ -53,6 +54,20 @@ const withLineSDK = (config) => {
       return mod;
     },
   ]);
+
+  // ── 2. Remove Apple Sign In entitlement ───────────────────────────────────
+  // @expo/prebuild-config auto-applies expo-apple-authentication whenever the
+  // package is installed, unconditionally adding com.apple.developer.applesignin.
+  // Personal Apple Developer teams cannot use this capability, so we strip it
+  // here (this plugin runs last in the array).
+  // Restore expo-apple-authentication to app.json plugins once the Developer
+  // Program is approved and the App ID capability is registered.
+  config = withEntitlementsPlist(config, (mod) => {
+    delete mod.modResults['com.apple.developer.applesignin'];
+    return mod;
+  });
+
+  return config;
 };
 
 module.exports = withLineSDK;
