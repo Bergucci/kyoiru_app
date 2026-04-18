@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -165,7 +166,6 @@ export default function LoginScreen() {
 
   const renderProviderIcon = (
     provider: SocialProvider,
-    foreground: string,
     badgeForeground: string,
   ) => {
     if (provider === 'apple') {
@@ -179,7 +179,7 @@ export default function LoginScreen() {
         name="line"
         iconStyle="brand"
         size={18}
-        color={foreground}
+        color={badgeForeground}
       />
     );
   };
@@ -191,7 +191,13 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.hero}>
-          <Text style={styles.kicker}>KYOIRU</Text>
+          <View style={styles.heroLogo}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.heroIcon}
+            />
+            <Text style={styles.heroAppName}>Kyoiru</Text>
+          </View>
           <Text style={styles.title}>今日いることだけ、そっと伝える。</Text>
         </View>
 
@@ -232,7 +238,6 @@ export default function LoginScreen() {
                   >
                     {renderProviderIcon(
                       provider,
-                      appearance.foreground,
                       appearance.badgeForeground,
                     )}
                   </View>
@@ -374,20 +379,29 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     borderRadius: 26,
     backgroundColor: colors.accentStrong,
-    gap: 6,
+    gap: 12,
   },
-  kicker: {
-    color: '#d9ebdf',
-    fontSize: 11,
+  heroLogo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  heroIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  heroAppName: {
+    color: '#fffdf8',
+    fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   title: {
     color: '#fffdf8',
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '700',
-    lineHeight: 36,
+    lineHeight: 26,
   },
   authCard: {
     padding: 18,

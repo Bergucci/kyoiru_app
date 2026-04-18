@@ -28,6 +28,12 @@
       "expo-web-browser",
       ["expo-build-properties", { "ios": { "useFrameworks": "static" } }],
       "@xmartlabs/react-native-line",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "プロフィールアイコンを設定するために写真ライブラリへのアクセスが必要です。"
+        }
+      ],
       "./plugins/with-line-sdk"
     ],
     "experiments": {
