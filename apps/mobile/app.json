@@ -14,8 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.kyoiru.app",
-      "usesAppleSignIn": true
+      "bundleIdentifier": "com.kyoiru.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,7 +28,8 @@
       "expo-apple-authentication",
       "expo-web-browser",
       ["expo-build-properties", { "ios": { "useFrameworks": "static" } }],
-      "@xmartlabs/react-native-line"
+      "@xmartlabs/react-native-line",
+      "./plugins/with-line-sdk"
     ],
     "experiments": {
       "typedRoutes": true
