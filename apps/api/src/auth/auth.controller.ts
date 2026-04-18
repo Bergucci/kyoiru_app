@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Patch,
   Post,
   Request,
@@ -35,6 +36,9 @@ interface AuthRequest extends FastifyRequest {
 
 @Controller('auth')
 export class AuthController {
+  // [LINE DEBUG]
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly profileService: ProfileService,
@@ -143,6 +147,8 @@ export class AuthController {
   @Post('line')
   @HttpCode(HttpStatus.OK)
   async lineLogin(@Body() dto: LineLoginDto) {
+    // [LINE DEBUG] DTO 到達確認
+    this.logger.log(`[LINE] /auth/line hit | accessToken present: ${Boolean(dto.accessToken)} | length: ${dto.accessToken?.length ?? 0} | prefix: ${dto.accessToken?.slice(0, 8) ?? 'none'}`);
     const subject = await this.lineVerify.verify(dto.accessToken);
     return this.authService.socialLogin(AuthProvider.line, subject);
   }
