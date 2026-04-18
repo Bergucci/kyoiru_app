@@ -6,6 +6,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "incremental": true,
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@kyoiru/contracts": ["../../packages/contracts/dist/index.d.ts"],
       "@kyoiru/domain": ["../../packages/domain/dist/index.d.ts"]
