@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
+  <defs>
+    <radialGradient id="bodyL" cx="0.4" cy="0.35" r="0.85">
+      <stop offset="0%" stop-color="#FFD3A8"/>
+      <stop offset="60%" stop-color="#FFA978"/>
+      <stop offset="100%" stop-color="#EE8A57"/>
+    </radialGradient>
+  </defs>
+  <!-- mark -->
+  <g transform="translate(20,30)">
+    <!-- chirp notes -->
+    <g fill="#F2A063">
+      <circle cx="240" cy="120" r="7" opacity="0.55"/>
+      <circle cx="270" cy="85" r="10" opacity="0.75"/>
+      <circle cx="305" cy="50" r="13" opacity="0.95"/>
+    </g>
+    <!-- tail -->
+    <path d="M 30 195 L 80 165 L 80 225 Z" fill="#E2814E"/>
+    <!-- body -->
+    <ellipse cx="155" cy="195" rx="115" ry="105" fill="url(#bodyL)"/>
+    <!-- wing -->
+    <path d="M 105 185 Q 130 145 195 160 Q 225 200 165 250 Q 110 255 105 185 Z" fill="#E89366" opacity="0.85"/>
+    <!-- beak -->
+    <path d="M 245 195 L 285 210 L 245 225 Z" fill="#FFB04A"/>
+    <!-- eye -->
+    <circle cx="210" cy="170" r="11" fill="#3A2418"/>
+    <circle cx="214" cy="166" r="3.5" fill="#FFFFFF"/>
+    <!-- feet -->
+    <g stroke="#C46A3E" stroke-width="5" stroke-linecap="round">
+      <line x1="125" y1="295" x2="125" y2="312"/>
+      <line x1="180" y1="295" x2="180" y2="312"/>
+    </g>
+  </g>
+  <!-- wordmark -->
+  <g transform="translate(380,0)" font-family="'Hiragino Sans','Yu Gothic UI','Noto Sans JP',sans-serif">
+    <text x="0" y="220" font-size="180" font-weight="700" fill="#5C3F2E" letter-spacing="-4">Kyoiru</text>
+    <text x="6" y="285" font-size="42" font-weight="500" fill="#A07458" letter-spacing="6">今日いる</text>
+  </g>
+</svg>
