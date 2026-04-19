@@ -88,6 +88,12 @@ export default function FriendsTabScreen() {
     }
   }, [session?.accessToken]);
 
+  useEffect(() => {
+    if (session?.accessToken && !inviteLink) {
+      void prepareInvite(false);
+    }
+  }, [session?.accessToken, inviteLink]);
+
   if (!session) {
     return <Redirect href={'/(auth)/login' as never} />;
   }

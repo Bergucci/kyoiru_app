@@ -280,12 +280,6 @@ export default function MonitoringTabScreen() {
               </View>
             ))}
           </View>
-          {subscriptionCopy ? (
-            <View style={styles.planBox}>
-              <Text style={styles.planName}>{subscriptionCopy.planName}</Text>
-              <Text style={styles.planPrice}>{subscriptionCopy.reviewSummary}</Text>
-            </View>
-          ) : null}
           <Pressable
             style={styles.primaryButton}
             onPress={() => {
@@ -674,22 +668,6 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontWeight: '700',
     color: colors.ink,
-  },
-  planBox: {
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: colors.accentTint,
-    gap: 4,
-  },
-  planName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  planPrice: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.muted,
   },
   paywallFinePrint: {
     fontSize: 11,

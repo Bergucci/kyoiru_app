@@ -7,7 +7,7 @@ import { colors } from '../../../src/ui/theme';
 const primaryMenuItems = [
   {
     label: '表示名・ユーザーID',
-    detail: 'プロフィール',
+    detail: 'USER_ID',
     href: '/(tabs)/settings/profile',
   },
   {
@@ -39,7 +39,7 @@ function getInitial(value: string | null | undefined) {
 
 export default function SettingsIndexScreen() {
   const router = useRouter();
-  const { session, clearSession } = useSession();
+  const { session } = useSession();
 
   if (!session) {
     return <Redirect href={'/(auth)/login' as never} />;
@@ -50,6 +50,11 @@ export default function SettingsIndexScreen() {
   }
 
   const profileInitial = getInitial(session.user.displayName || session.user.userId);
+  const resolvedPrimaryMenuItems = primaryMenuItems.map((item) =>
+    item.label === '表示名・ユーザーID'
+      ? { ...item, detail: session.user.userId }
+      : item,
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -78,12 +83,13 @@ export default function SettingsIndexScreen() {
       </View>
 
       <View style={styles.menuList}>
-        {primaryMenuItems.map((item) => (
+        {resolvedPrimaryMenuItems.map((item) => (
           <Pressable
             key={item.href}
             style={[
               styles.menuItem,
-              item.href !== primaryMenuItems[primaryMenuItems.length - 1]?.href &&
+              item.href !==
+                resolvedPrimaryMenuItems[resolvedPrimaryMenuItems.length - 1]?.href &&
                 styles.menuItemBorder,
             ]}
             onPress={() => {
@@ -129,16 +135,6 @@ export default function SettingsIndexScreen() {
           </Pressable>
         ))}
       </View>
-
-      <Pressable
-        style={styles.logoutButton}
-        onPress={() => {
-          clearSession();
-          router.replace('/(auth)/login' as never);
-        }}
-      >
-        <Text style={styles.logoutLabel}>ローカルセッションを破棄</Text>
-      </Pressable>
     </ScrollView>
   );
 }
@@ -255,16 +251,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     paddingHorizontal: 4,
     letterSpacing: 0.5,
-  },
-  logoutButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: colors.secondarySurface,
-  },
-  logoutLabel: {
-    color: colors.ink,
-    fontWeight: '700',
   },
 });
