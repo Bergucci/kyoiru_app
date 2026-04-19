@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
 import { formatDateTime } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
@@ -214,193 +215,199 @@ export default function FriendsTabScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>友達</Text>
-        <Text style={styles.heroText}>
-          「今日いる」を共有できる相手をここで管理します。
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>招待リンク</Text>
-        <Text style={styles.metaText}>
-          リンクを送ると、相手が承認したところでフレンドになれます。
-        </Text>
-        {inviteLink ? (
-          <>
-            <View style={styles.invitePanel}>
-              <Text selectable style={styles.inviteUrl}>
-                {inviteLink.inviteUrl}
-              </Text>
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable
-                style={styles.primaryButton}
-                onPress={() => {
-                  void Share.share({ message: inviteLink.shareText });
-                }}
-              >
-                <Text style={styles.primaryButtonLabel}>リンクを共有</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => {
-                  void Share.share({ message: inviteLink.inviteUrl });
-                }}
-              >
-                <Text style={styles.secondaryButtonLabel}>コピー</Text>
-              </Pressable>
-            </View>
-          </>
-        ) : null}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>友達追加</Text>
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="userId を入力"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-        />
-        <Pressable
-          style={[styles.primaryButton, searching && styles.buttonDisabled]}
-          disabled={searching}
-          onPress={() => {
-            void searchUsers();
-          }}
-        >
-          <Text style={styles.primaryButtonLabel}>検索する</Text>
-        </Pressable>
-        {searching ? <ActivityIndicator color={colors.accent} /> : null}
-        {searchResults.map((result) => (
-          <View key={result.userId} style={styles.listCard}>
-            <Text style={styles.listTitle}>{result.displayName}</Text>
-            <Text style={styles.metaText}>@{result.userId}</Text>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => {
-                void sendRequest(result.userId);
-              }}
-            >
-              <Text style={styles.secondaryButtonLabel}>友達申請を送る</Text>
-            </Pressable>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>友達一覧</Text>
-          <Pressable onPress={() => void loadFriendsTab()}>
-            <Text style={styles.refreshText}>再読込</Text>
-          </Pressable>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.hero}>
+          <Text style={styles.heroTitle}>友達</Text>
+          <Text style={styles.heroText}>
+            「今日いる」を共有できる相手をここで管理します。
+          </Text>
         </View>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : friends.length === 0 ? (
-          <Text style={styles.metaText}>まだ友達は追加されていません。</Text>
-        ) : (
-          friends.map((item) => (
-            <Pressable
-              key={item.friendshipId}
-              style={styles.listCard}
-              onPress={() => {
-                Alert.alert(
-                  item.friend.displayName,
-                  [`@${item.friend.userId}`, `友達になった日: ${formatDateTime(item.friendedAt)}`].join(
-                    '\n',
-                  ),
-                );
-              }}
-            >
-              <View style={styles.memberRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>
-                    {getInitial(item.friend.displayName || item.friend.userId)}
-                  </Text>
-                </View>
-                <View style={styles.memberBody}>
-                  <Text style={styles.listTitle}>{item.friend.displayName}</Text>
-                  <Text style={styles.memberStatus}>
-                    {item.latestCheckinAt ? '今日反応済み' : 'まだ未反応'}
-                  </Text>
-                  <Text style={styles.memberMetaLine}>
-                    {formatFriendActivity(item)}
-                    {item.latestMood ? ` ／ 気分: ${item.latestMood}` : ''}
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
-          ))
-        )}
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>受信した申請</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : incomingRequests.length === 0 ? (
-          <Text style={styles.metaText}>現在の申請はありません。</Text>
-        ) : (
-          incomingRequests.map((request) => (
-            <View key={request.requestId} style={styles.listCard}>
-              <Text style={styles.listTitle}>{request.from.displayName}</Text>
-              <Text style={styles.pendingMetaText}>
-                @{request.from.userId} ／ {formatDateTime(request.createdAt)}
-              </Text>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>招待リンク</Text>
+          <Text style={styles.metaText}>
+            リンクを送ると、相手が承認したところでフレンドになれます。
+          </Text>
+          {inviteLink ? (
+            <>
+              <View style={styles.invitePanel}>
+                <Text selectable style={styles.inviteUrl}>
+                  {inviteLink.inviteUrl}
+                </Text>
+              </View>
               <View style={styles.actionRow}>
                 <Pressable
                   style={styles.primaryButton}
                   onPress={() => {
-                    void acceptRequest(request.requestId);
+                    void Share.share({ message: inviteLink.shareText });
                   }}
                 >
-                  <Text style={styles.primaryButtonLabel}>承認</Text>
+                  <Text style={styles.primaryButtonLabel}>リンクを共有</Text>
                 </Pressable>
                 <Pressable
                   style={styles.secondaryButton}
                   onPress={() => {
-                    void rejectRequest(request.requestId);
+                    void Share.share({ message: inviteLink.inviteUrl });
                   }}
                 >
-                  <Text style={styles.secondaryButtonLabel}>拒否</Text>
+                  <Text style={styles.secondaryButtonLabel}>コピー</Text>
                 </Pressable>
               </View>
-            </View>
-          ))
-        )}
-      </View>
+            </>
+          ) : null}
+        </View>
 
-      {outgoingRequests.length > 0 ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>送信中の申請</Text>
-          {outgoingRequests.map((request) => (
-            <View key={request.requestId} style={styles.listCard}>
-              <Text style={styles.listTitle}>{request.to.displayName}</Text>
-              <Text style={styles.pendingMetaText}>
-                @{request.to.userId} ／ {formatDateTime(request.createdAt)} に送信
-              </Text>
+          <Text style={styles.sectionTitle}>友達追加</Text>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="userId を入力"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+          />
+          <Pressable
+            style={[styles.primaryButton, searching && styles.buttonDisabled]}
+            disabled={searching}
+            onPress={() => {
+              void searchUsers();
+            }}
+          >
+            <Text style={styles.primaryButtonLabel}>検索する</Text>
+          </Pressable>
+          {searching ? <ActivityIndicator color={colors.accent} /> : null}
+          {searchResults.map((result) => (
+            <View key={result.userId} style={styles.listCard}>
+              <Text style={styles.listTitle}>{result.displayName}</Text>
+              <Text style={styles.metaText}>@{result.userId}</Text>
               <Pressable
                 style={styles.secondaryButton}
                 onPress={() => {
-                  void cancelRequest(request.requestId);
+                  void sendRequest(result.userId);
                 }}
               >
-                <Text style={styles.secondaryButtonLabel}>取消</Text>
+                <Text style={styles.secondaryButtonLabel}>友達申請を送る</Text>
               </Pressable>
             </View>
           ))}
         </View>
-      ) : null}
-    </ScrollView>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>友達一覧</Text>
+            <Pressable onPress={() => void loadFriendsTab()}>
+              <Text style={styles.refreshText}>再読込</Text>
+            </Pressable>
+          </View>
+          {loading ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : friends.length === 0 ? (
+            <Text style={styles.metaText}>まだ友達は追加されていません。</Text>
+          ) : (
+            friends.map((item) => (
+              <Pressable
+                key={item.friendshipId}
+                style={styles.listCard}
+                onPress={() => {
+                  Alert.alert(
+                    item.friend.displayName,
+                    [`@${item.friend.userId}`, `友達になった日: ${formatDateTime(item.friendedAt)}`].join(
+                      '\n',
+                    ),
+                  );
+                }}
+              >
+                <View style={styles.memberRow}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarLabel}>
+                      {getInitial(item.friend.displayName || item.friend.userId)}
+                    </Text>
+                  </View>
+                  <View style={styles.memberBody}>
+                    <Text style={styles.listTitle}>{item.friend.displayName}</Text>
+                    <Text style={styles.memberStatus}>
+                      {item.latestCheckinAt ? '今日反応済み' : 'まだ未反応'}
+                    </Text>
+                    <Text style={styles.memberMetaLine}>
+                      {formatFriendActivity(item)}
+                      {item.latestMood ? ` ／ 気分: ${item.latestMood}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            ))
+          )}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>受信した申請</Text>
+          {loading ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : incomingRequests.length === 0 ? (
+            <Text style={styles.metaText}>現在の申請はありません。</Text>
+          ) : (
+            incomingRequests.map((request) => (
+              <View key={request.requestId} style={styles.listCard}>
+                <Text style={styles.listTitle}>{request.from.displayName}</Text>
+                <Text style={styles.pendingMetaText}>
+                  @{request.from.userId} ／ {formatDateTime(request.createdAt)}
+                </Text>
+                <View style={styles.actionRow}>
+                  <Pressable
+                    style={styles.primaryButton}
+                    onPress={() => {
+                      void acceptRequest(request.requestId);
+                    }}
+                  >
+                    <Text style={styles.primaryButtonLabel}>承認</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={() => {
+                      void rejectRequest(request.requestId);
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonLabel}>拒否</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        {outgoingRequests.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>送信中の申請</Text>
+            {outgoingRequests.map((request) => (
+              <View key={request.requestId} style={styles.listCard}>
+                <Text style={styles.listTitle}>{request.to.displayName}</Text>
+                <Text style={styles.pendingMetaText}>
+                  @{request.to.userId} ／ {formatDateTime(request.createdAt)} に送信
+                </Text>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    void cancelRequest(request.requestId);
+                  }}
+                >
+                  <Text style={styles.secondaryButtonLabel}>取消</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.pageBg,
+  },
   container: {
     padding: 20,
     gap: 16,
