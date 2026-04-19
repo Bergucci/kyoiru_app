@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
@@ -46,6 +47,10 @@ export default function HomeTabScreen() {
   const [loading, setLoading] = useState(true);
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
   const [submittingMood, setSubmittingMood] = useState(false);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupType, setGroupType] = useState<'friends' | 'family'>('friends');
+  const [initialMemberUserIds, setInitialMemberUserIds] = useState('');
 
   useEffect(() => {
     if (session?.accessToken) {
@@ -116,6 +121,42 @@ export default function HomeTabScreen() {
     }
   };
 
+  const createGroup = async () => {
+    if (!groupName.trim()) {
+      Alert.alert('入力不足', 'グループ名を入力してください。');
+      return;
+    }
+
+    try {
+      setCreatingGroup(true);
+      const response = await apiRequest<GroupSummary>('/groups', {
+        method: 'POST',
+        token: currentSession.accessToken,
+        body: {
+          name: groupName.trim(),
+          type: groupType,
+          initialMemberUserIds: initialMemberUserIds
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean),
+        },
+      });
+      setGroupName('');
+      setInitialMemberUserIds('');
+      await loadHomeData();
+      router.push(
+        {
+          pathname: '/(tabs)/home/groups/[groupId]',
+          params: { groupId: response.groupId },
+        } as never,
+      );
+    } catch (error) {
+      Alert.alert('グループ作成に失敗しました', toApiErrorMessage(error));
+    } finally {
+      setCreatingGroup(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.hero}>
@@ -135,7 +176,7 @@ export default function HomeTabScreen() {
         {loading ? (
           <ActivityIndicator color={colors.accent} />
         ) : (
-          <View style={styles.statusPanel}>
+          <>
             <Text style={styles.statusText}>
               状態: {toAliveStateLabel(today?.state ?? null)}
             </Text>
@@ -157,7 +198,7 @@ export default function HomeTabScreen() {
                 {today?.checkedIn ? '今日反応済み' : '今日いる'}
               </Text>
             </Pressable>
-          </View>
+          </>
         )}
       </View>
 
@@ -186,6 +227,71 @@ export default function HomeTabScreen() {
           </View>
         </View>
       ) : null}
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>グループ作成</Text>
+        <TextInput
+          value={groupName}
+          onChangeText={setGroupName}
+          placeholder="グループ名"
+          style={styles.input}
+        />
+        <View style={styles.segment}>
+          <Pressable
+            style={[
+              styles.segmentButton,
+              groupType === 'friends' && styles.segmentButtonActive,
+            ]}
+            onPress={() => {
+              setGroupType('friends');
+            }}
+          >
+            <Text
+              style={[
+                styles.segmentLabel,
+                groupType === 'friends' && styles.segmentLabelActive,
+              ]}
+            >
+              友人・恋人
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.segmentButton,
+              groupType === 'family' && styles.segmentButtonActive,
+            ]}
+            onPress={() => {
+              setGroupType('family');
+            }}
+          >
+            <Text
+              style={[
+                styles.segmentLabel,
+                groupType === 'family' && styles.segmentLabelActive,
+              ]}
+            >
+              家族
+            </Text>
+          </Pressable>
+        </View>
+        <TextInput
+          value={initialMemberUserIds}
+          onChangeText={setInitialMemberUserIds}
+          placeholder="初期メンバー userId をカンマ区切りで入力 (任意)"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <Pressable
+          style={[styles.primaryButton, creatingGroup && styles.buttonDisabled]}
+          disabled={creatingGroup}
+          onPress={() => {
+            void createGroup();
+          }}
+        >
+          <Text style={styles.primaryButtonLabel}>グループを作成する</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>所属グループ</Text>
@@ -267,9 +373,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
   },
-  statusPanel: {
-    gap: 8,
-  },
   metaText: {
     fontSize: 14,
     lineHeight: 21,
@@ -303,6 +406,36 @@ const styles = StyleSheet.create({
   chipLabel: {
     color: colors.accentStrong,
     fontWeight: '600',
+  },
+  input: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  segment: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    backgroundColor: colors.surfaceAlt,
+    padding: 4,
+  },
+  segmentButton: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  segmentButtonActive: {
+    backgroundColor: colors.white,
+  },
+  segmentLabel: {
+    color: colors.muted,
+    fontWeight: '600',
+  },
+  segmentLabelActive: {
+    color: colors.ink,
   },
   groupCard: {
     padding: 16,

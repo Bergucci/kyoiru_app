@@ -85,14 +85,9 @@ export default function FriendsTabScreen() {
   useEffect(() => {
     if (session?.accessToken) {
       void loadFriendsTab();
-    }
-  }, [session?.accessToken]);
-
-  useEffect(() => {
-    if (session?.accessToken && !inviteLink) {
       void prepareInvite(false);
     }
-  }, [session?.accessToken, inviteLink]);
+  }, [session?.accessToken]);
 
   if (!session) {
     return <Redirect href={'/(auth)/login' as never} />;
@@ -259,33 +254,47 @@ export default function FriendsTabScreen() {
             </View>
           </>
         ) : null}
-        <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.primaryButton, preparingInvite && styles.buttonDisabled]}
-            disabled={preparingInvite}
-            onPress={() => {
-              void prepareInvite(false);
-            }}
-          >
-            <Text style={styles.primaryButtonLabel}>リンクを用意する</Text>
-          </Pressable>
-          {inviteLink ? (
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>友達追加</Text>
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="userId を入力"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <Pressable
+          style={[styles.primaryButton, searching && styles.buttonDisabled]}
+          disabled={searching}
+          onPress={() => {
+            void searchUsers();
+          }}
+        >
+          <Text style={styles.primaryButtonLabel}>検索する</Text>
+        </Pressable>
+        {searching ? <ActivityIndicator color={colors.accent} /> : null}
+        {searchResults.map((result) => (
+          <View key={result.userId} style={styles.listCard}>
+            <Text style={styles.listTitle}>{result.displayName}</Text>
+            <Text style={styles.metaText}>@{result.userId}</Text>
             <Pressable
-              style={[styles.secondaryButton, preparingInvite && styles.buttonDisabled]}
-              disabled={preparingInvite}
+              style={styles.secondaryButton}
               onPress={() => {
-                void prepareInvite(true);
+                void sendRequest(result.userId);
               }}
             >
-              <Text style={styles.secondaryButtonLabel}>再発行</Text>
+              <Text style={styles.secondaryButtonLabel}>友達申請を送る</Text>
             </Pressable>
-          ) : null}
-        </View>
+          </View>
+        ))}
       </View>
 
       <View style={styles.card}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>フレンド（{friends.length} 人）</Text>
+          <Text style={styles.sectionTitle}>友達一覧</Text>
           <Pressable onPress={() => void loadFriendsTab()}>
             <Text style={styles.refreshText}>再読込</Text>
           </Pressable>
@@ -331,7 +340,7 @@ export default function FriendsTabScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>承認待ち（{incomingRequests.length} 件）</Text>
+        <Text style={styles.sectionTitle}>受信した申請</Text>
         {loading ? (
           <ActivityIndicator color={colors.accent} />
         ) : incomingRequests.length === 0 ? (
@@ -339,11 +348,9 @@ export default function FriendsTabScreen() {
         ) : (
           incomingRequests.map((request) => (
             <View key={request.requestId} style={styles.listCard}>
-              <Text style={styles.listTitle}>
-                {request.from.displayName} さんから申請
-              </Text>
+              <Text style={styles.listTitle}>{request.from.displayName}</Text>
               <Text style={styles.pendingMetaText}>
-                {formatDateTime(request.createdAt)}
+                @{request.from.userId} ／ {formatDateTime(request.createdAt)}
               </Text>
               <View style={styles.actionRow}>
                 <Pressable
@@ -352,7 +359,7 @@ export default function FriendsTabScreen() {
                     void acceptRequest(request.requestId);
                   }}
                 >
-                  <Text style={styles.primaryButtonLabel}>承認する</Text>
+                  <Text style={styles.primaryButtonLabel}>承認</Text>
                 </Pressable>
                 <Pressable
                   style={styles.secondaryButton}
@@ -360,7 +367,7 @@ export default function FriendsTabScreen() {
                     void rejectRequest(request.requestId);
                   }}
                 >
-                  <Text style={styles.secondaryButtonLabel}>辞退</Text>
+                  <Text style={styles.secondaryButtonLabel}>拒否</Text>
                 </Pressable>
               </View>
             </View>
@@ -368,70 +375,15 @@ export default function FriendsTabScreen() {
         )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>友達追加</Text>
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="userId を入力"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-        />
-        <Pressable
-          style={[styles.primaryButton, searching && styles.buttonDisabled]}
-          disabled={searching}
-          onPress={() => {
-            void searchUsers();
-          }}
-        >
-          <Text style={styles.primaryButtonLabel}>検索する</Text>
-        </Pressable>
-        {searching ? <ActivityIndicator color={colors.accent} /> : null}
-        {searchResults.map((result) => (
-          <View key={result.userId} style={styles.listCard}>
-            <View style={styles.memberRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarLabel}>
-                  {getInitial(result.displayName || result.userId)}
-                </Text>
-              </View>
-              <View style={styles.memberBody}>
-                <Text style={styles.listTitle}>{result.displayName}</Text>
-                <Text style={styles.metaText}>@{result.userId}</Text>
-              </View>
-            </View>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => {
-                void sendRequest(result.userId);
-              }}
-            >
-              <Text style={styles.secondaryButtonLabel}>友達申請を送る</Text>
-            </Pressable>
-          </View>
-        ))}
-      </View>
-
       {outgoingRequests.length > 0 ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>送信中の申請</Text>
           {outgoingRequests.map((request) => (
             <View key={request.requestId} style={styles.listCard}>
-              <View style={styles.memberRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>
-                    {getInitial(request.to.displayName || request.to.userId)}
-                  </Text>
-                </View>
-                <View style={styles.memberBody}>
-                  <Text style={styles.listTitle}>{request.to.displayName}</Text>
-                  <Text style={styles.metaText}>@{request.to.userId}</Text>
-                  <Text style={styles.metaText}>
-                    送信日時: {formatDateTime(request.createdAt)}
-                  </Text>
-                </View>
-              </View>
+              <Text style={styles.listTitle}>{request.to.displayName}</Text>
+              <Text style={styles.pendingMetaText}>
+                @{request.to.userId} ／ {formatDateTime(request.createdAt)} に送信
+              </Text>
               <Pressable
                 style={styles.secondaryButton}
                 onPress={() => {
@@ -499,6 +451,7 @@ const styles = StyleSheet.create({
   },
   pendingMetaText: {
     fontSize: 13,
+    lineHeight: 19,
     color: colors.muted,
   },
   memberRow: {

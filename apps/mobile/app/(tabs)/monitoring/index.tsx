@@ -288,14 +288,6 @@ export default function MonitoringTabScreen() {
           >
             <Text style={styles.primaryButtonLabel}>7 日間無料で試す</Text>
           </Pressable>
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => {
-              router.push('/(tabs)/settings/subscription-management' as never);
-            }}
-          >
-            <Text style={styles.secondaryButtonLabel}>サブスク管理へ</Text>
-          </Pressable>
           <Text style={styles.paywallFinePrint}>
             監視ではなく、反応がない時に気づきやすくするための機能です。
           </Text>
