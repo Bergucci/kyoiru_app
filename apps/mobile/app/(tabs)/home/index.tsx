@@ -229,8 +229,36 @@ export default function HomeTabScreen() {
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>グループ作成</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>所属グループ</Text>
+          <Text style={styles.sectionHint}>必要なら新しく作成できます</Text>
+        </View>
+        {loading ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : groups.length === 0 ? (
+          <Text style={styles.metaText}>まだ所属グループがありません。</Text>
+        ) : (
+          groups.map((group) => (
+            <Pressable
+              key={group.groupId}
+              style={styles.groupCard}
+              onPress={() => {
+                router.push({
+                  pathname: '/(tabs)/home/groups/[groupId]',
+                  params: { groupId: group.groupId },
+                } as never);
+              }}
+            >
+              <Text style={styles.groupTitle}>{group.name}</Text>
+              <Text style={styles.metaText}>{toGroupTypeLabel(group.type)}</Text>
+              <Text style={styles.metaText}>
+                メンバー数: {group.memberCount}
+              </Text>
+            </Pressable>
+          ))
+        )}
         <View style={styles.nestedPanel}>
+          <Text style={styles.nestedPanelTitle}>グループを作成</Text>
           <TextInput
             value={groupName}
             onChangeText={setGroupName}
@@ -294,34 +322,6 @@ export default function HomeTabScreen() {
           </Pressable>
         </View>
       </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>所属グループ</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : groups.length === 0 ? (
-          <Text style={styles.metaText}>まだ所属グループがありません。</Text>
-        ) : (
-          groups.map((group) => (
-            <Pressable
-              key={group.groupId}
-              style={styles.groupCard}
-              onPress={() => {
-                router.push({
-                  pathname: '/(tabs)/home/groups/[groupId]',
-                  params: { groupId: group.groupId },
-                } as never);
-              }}
-            >
-              <Text style={styles.groupTitle}>{group.name}</Text>
-              <Text style={styles.metaText}>{toGroupTypeLabel(group.type)}</Text>
-              <Text style={styles.metaText}>
-                メンバー数: {group.memberCount}
-              </Text>
-            </Pressable>
-          ))
-        )}
-      </View>
     </ScrollView>
   );
 }
@@ -370,15 +370,16 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: '600',
   },
+  sectionHint: {
+    fontSize: 12,
+    color: colors.muted,
+  },
   statusText: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.ink,
   },
   statusPanel: {
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: colors.accentTint,
     gap: 8,
   },
   metaText: {
@@ -430,6 +431,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.nestedBorder,
     gap: 10,
+  },
+  nestedPanelTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.ink,
   },
   segment: {
     flexDirection: 'row',

@@ -5,19 +5,32 @@ import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 
 const primaryMenuItems = [
-  { label: 'プロフィール', href: '/(tabs)/settings/profile' },
-  { label: 'アカウント', href: '/(tabs)/settings/account' },
-  { label: '通知設定', href: '/(tabs)/settings/notifications' },
-  { label: 'サブスク管理', href: '/(tabs)/settings/subscription-management' },
+  {
+    label: '表示名・ユーザーID',
+    detail: 'プロフィール',
+    href: '/(tabs)/settings/profile',
+  },
+  {
+    label: '通知',
+    detail: 'オン',
+    href: '/(tabs)/settings/notifications',
+  },
+  {
+    label: 'ブロックリスト',
+    detail: '一覧',
+    href: '/(tabs)/settings/blocks',
+  },
+  {
+    label: 'サブスクリプション',
+    detail: '見守り / 有効',
+    href: '/(tabs)/settings/subscription-management',
+  },
 ];
 
 const supportMenuItems = [
-  { label: 'block 一覧', href: '/(tabs)/settings/blocks' },
-  { label: 'ヘルプ', href: '/(tabs)/settings/help' },
-  { label: '法務リンク', href: '/(tabs)/settings/legal' },
-  { label: '位置情報の説明', href: '/(tabs)/settings/location-permission' },
-  { label: '見守りプラン説明', href: '/(tabs)/settings/subscription-info' },
-  { label: 'アカウント削除', href: '/(tabs)/settings/account-delete' },
+  { label: 'ヘルプ・お問い合わせ', href: '/(tabs)/settings/help' },
+  { label: '利用規約・プライバシー', href: '/(tabs)/settings/legal' },
+  { label: 'アカウントを削除', href: '/(tabs)/settings/account-delete', danger: true },
 ];
 
 function getInitial(value: string | null | undefined) {
@@ -56,77 +69,65 @@ export default function SettingsIndexScreen() {
             <Text style={styles.profileName}>
               {session.user.displayName || '表示名未設定'}
             </Text>
-            <Text style={styles.profileMeta}>@{session.user.userId}</Text>
+            <Text style={styles.profileMeta}>{session.user.userId}</Text>
           </View>
           <View style={styles.profileBadge}>
-            <Text style={styles.profileBadgeLabel}>アプリ設定</Text>
+            <Text style={styles.profileBadgeLabel}>見守り中</Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>本体設定</Text>
-        <View style={styles.menuList}>
-          {primaryMenuItems.map((item) => (
-            <Pressable
-              key={item.href}
-              style={[
-                styles.menuItem,
-                item.href !== primaryMenuItems[primaryMenuItems.length - 1]?.href &&
-                  styles.menuItemBorder,
-              ]}
-              onPress={() => {
-                router.push(item.href as never);
-              }}
-            >
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <View style={styles.menuTrailing}>
-                <Text style={styles.menuMeta}>開く</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={colors.hint}
-                />
-              </View>
-            </Pressable>
-          ))}
-        </View>
+      <View style={styles.menuList}>
+        {primaryMenuItems.map((item) => (
+          <Pressable
+            key={item.href}
+            style={[
+              styles.menuItem,
+              item.href !== primaryMenuItems[primaryMenuItems.length - 1]?.href &&
+                styles.menuItemBorder,
+            ]}
+            onPress={() => {
+              router.push(item.href as never);
+            }}
+          >
+            <Text style={styles.menuLabel}>{item.label}</Text>
+            <View style={styles.menuTrailing}>
+              <Text style={styles.menuMeta}>{item.detail}</Text>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={colors.hint}
+              />
+            </View>
+          </Pressable>
+        ))}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>補助メニュー</Text>
-        <View style={styles.menuList}>
-          {supportMenuItems.map((item) => (
-            <Pressable
-              key={item.href}
-              style={[
-                styles.menuItem,
-                item.href !== supportMenuItems[supportMenuItems.length - 1]?.href &&
-                  styles.menuItemBorder,
-              ]}
-              onPress={() => {
-                router.push(item.href as never);
-              }}
-            >
-              <Text
-                style={[
-                  styles.menuLabel,
-                  item.href.endsWith('account-delete') && styles.dangerLabel,
-                ]}
-              >
-                {item.label}
-              </Text>
-              <View style={styles.menuTrailing}>
-                <Text style={styles.menuMeta}>開く</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={colors.hint}
-                />
-              </View>
-            </Pressable>
-          ))}
-        </View>
+      <Text style={styles.supportLabel}>サポート</Text>
+
+      <View style={styles.menuList}>
+        {supportMenuItems.map((item) => (
+          <Pressable
+            key={item.href}
+            style={[
+              styles.menuItem,
+              item.href !== supportMenuItems[supportMenuItems.length - 1]?.href &&
+                styles.menuItemBorder,
+            ]}
+            onPress={() => {
+              router.push(item.href as never);
+            }}
+          >
+            <Text style={[styles.menuLabel, item.danger && styles.dangerLabel]}>
+              {item.label}
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={colors.hint}
+            />
+          </Pressable>
+        ))}
       </View>
 
       <Pressable
@@ -199,7 +200,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   profileMeta: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.muted,
   },
   profileBadge: {
@@ -212,14 +213,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.accentStrong,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.ink,
   },
   menuList: {
     borderRadius: 20,
@@ -253,8 +246,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   menuMeta: {
-    color: colors.accent,
-    fontWeight: '600',
+    color: colors.muted,
+    fontSize: 13,
+  },
+  supportLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.muted,
+    paddingHorizontal: 4,
+    letterSpacing: 0.5,
   },
   logoutButton: {
     alignItems: 'center',

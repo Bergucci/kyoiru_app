@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -20,6 +19,8 @@ import { colors } from '../../../src/ui/theme';
 interface FriendSummary {
   friendshipId: string;
   friendedAt: string;
+  latestCheckinAt?: string | null;
+  latestMood?: string | null;
   friend: {
     userId: string;
     displayName: string;
@@ -60,6 +61,13 @@ interface FriendInviteLinkResponse {
 
 function getInitial(value: string | null | undefined) {
   return (value?.trim().charAt(0) || '友').toUpperCase();
+}
+
+function formatFriendActivity(item: FriendSummary) {
+  if (item.latestCheckinAt) {
+    return `今日 ${formatDateTime(item.latestCheckinAt)}`;
+  }
+  return `最終反応: ${formatDateTime(item.friendedAt)}`;
 }
 
 export default function FriendsTabScreen() {
@@ -209,13 +217,69 @@ export default function FriendsTabScreen() {
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>友達</Text>
         <Text style={styles.heroText}>
-          既存友達、友達追加、承認待ち、招待リンク共有をここから扱えます。
+          「今日いる」を共有できる相手をここで管理します。
         </Text>
       </View>
 
       <View style={styles.card}>
+        <Text style={styles.sectionTitle}>招待リンク</Text>
+        <Text style={styles.metaText}>
+          リンクを送ると、相手が承認したところでフレンドになれます。
+        </Text>
+        {inviteLink ? (
+          <>
+            <View style={styles.invitePanel}>
+              <Text selectable style={styles.inviteUrl}>
+                {inviteLink.inviteUrl}
+              </Text>
+            </View>
+            <View style={styles.actionRow}>
+              <Pressable
+                style={styles.primaryButton}
+                onPress={() => {
+                  void Share.share({ message: inviteLink.shareText });
+                }}
+              >
+                <Text style={styles.primaryButtonLabel}>リンクを共有</Text>
+              </Pressable>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => {
+                  void Share.share({ message: inviteLink.inviteUrl });
+                }}
+              >
+                <Text style={styles.secondaryButtonLabel}>コピー</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.primaryButton, preparingInvite && styles.buttonDisabled]}
+            disabled={preparingInvite}
+            onPress={() => {
+              void prepareInvite(false);
+            }}
+          >
+            <Text style={styles.primaryButtonLabel}>リンクを用意する</Text>
+          </Pressable>
+          {inviteLink ? (
+            <Pressable
+              style={[styles.secondaryButton, preparingInvite && styles.buttonDisabled]}
+              disabled={preparingInvite}
+              onPress={() => {
+                void prepareInvite(true);
+              }}
+            >
+              <Text style={styles.secondaryButtonLabel}>再発行</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      <View style={styles.card}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>友達一覧</Text>
+          <Text style={styles.sectionTitle}>フレンド（{friends.length} 人）</Text>
           <Pressable onPress={() => void loadFriendsTab()}>
             <Text style={styles.refreshText}>再読込</Text>
           </Pressable>
@@ -246,13 +310,54 @@ export default function FriendsTabScreen() {
                 </View>
                 <View style={styles.memberBody}>
                   <Text style={styles.listTitle}>{item.friend.displayName}</Text>
-                  <Text style={styles.metaText}>@{item.friend.userId}</Text>
-                  <Text style={styles.metaText}>
-                    友達になった日: {formatDateTime(item.friendedAt)}
+                  <Text style={styles.memberStatus}>
+                    {item.latestCheckinAt ? '今日反応済み' : 'まだ未反応'}
+                  </Text>
+                  <Text style={styles.memberMetaLine}>
+                    {formatFriendActivity(item)}
+                    {item.latestMood ? ` ／ 気分: ${item.latestMood}` : ''}
                   </Text>
                 </View>
               </View>
             </Pressable>
+          ))
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>承認待ち（{incomingRequests.length} 件）</Text>
+        {loading ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : incomingRequests.length === 0 ? (
+          <Text style={styles.metaText}>現在の申請はありません。</Text>
+        ) : (
+          incomingRequests.map((request) => (
+            <View key={request.requestId} style={styles.listCard}>
+              <Text style={styles.listTitle}>
+                {request.from.displayName} さんから申請
+              </Text>
+              <Text style={styles.pendingMetaText}>
+                {formatDateTime(request.createdAt)}
+              </Text>
+              <View style={styles.actionRow}>
+                <Pressable
+                  style={styles.primaryButton}
+                  onPress={() => {
+                    void acceptRequest(request.requestId);
+                  }}
+                >
+                  <Text style={styles.primaryButtonLabel}>承認する</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    void rejectRequest(request.requestId);
+                  }}
+                >
+                  <Text style={styles.secondaryButtonLabel}>辞退</Text>
+                </Pressable>
+              </View>
+            </View>
           ))
         )}
       </View>
@@ -302,60 +407,10 @@ export default function FriendsTabScreen() {
         ))}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>受信した申請</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : incomingRequests.length === 0 ? (
-          <Text style={styles.metaText}>現在の申請はありません。</Text>
-        ) : (
-          incomingRequests.map((request) => (
-            <View key={request.requestId} style={styles.listCard}>
-              <View style={styles.memberRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>
-                    {getInitial(request.from.displayName || request.from.userId)}
-                  </Text>
-                </View>
-                <View style={styles.memberBody}>
-                  <Text style={styles.listTitle}>{request.from.displayName}</Text>
-                  <Text style={styles.metaText}>@{request.from.userId}</Text>
-                  <Text style={styles.metaText}>
-                    受信日時: {formatDateTime(request.createdAt)}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.actionRow}>
-                <Pressable
-                  style={styles.primaryButton}
-                  onPress={() => {
-                    void acceptRequest(request.requestId);
-                  }}
-                >
-                  <Text style={styles.primaryButtonLabel}>承認</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.secondaryButton}
-                  onPress={() => {
-                    void rejectRequest(request.requestId);
-                  }}
-                >
-                  <Text style={styles.secondaryButtonLabel}>拒否</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>送信中の申請</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : outgoingRequests.length === 0 ? (
-          <Text style={styles.metaText}>送信中の申請はありません。</Text>
-        ) : (
-          outgoingRequests.map((request) => (
+      {outgoingRequests.length > 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>送信中の申請</Text>
+          {outgoingRequests.map((request) => (
             <View key={request.requestId} style={styles.listCard}>
               <View style={styles.memberRow}>
                 <View style={styles.avatar}>
@@ -380,68 +435,9 @@ export default function FriendsTabScreen() {
                 <Text style={styles.secondaryButtonLabel}>取消</Text>
               </Pressable>
             </View>
-          ))
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>友達追加用リンク</Text>
-        <Text style={styles.metaText}>
-          LINE 共有や外部共有で使う 30 日 / 1 回限りのリンクです。
-        </Text>
-        {inviteLink ? (
-          <>
-            <View style={styles.invitePanel}>
-              <Text selectable style={styles.inviteUrl}>
-                {inviteLink.inviteUrl}
-              </Text>
-            </View>
-            <Text style={styles.metaText}>
-              有効期限: {formatDateTime(inviteLink.expiresAt)}
-            </Text>
-            <View style={styles.actionRow}>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => {
-                  void Share.share({ message: inviteLink.shareText });
-                }}
-              >
-                <Text style={styles.secondaryButtonLabel}>共有</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => {
-                  void Linking.openURL(inviteLink.lineShareUrl);
-                }}
-              >
-                <Text style={styles.secondaryButtonLabel}>LINE で送る</Text>
-              </Pressable>
-            </View>
-          </>
-        ) : null}
-        <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.primaryButton, preparingInvite && styles.buttonDisabled]}
-            disabled={preparingInvite}
-            onPress={() => {
-              void prepareInvite(false);
-            }}
-          >
-            <Text style={styles.primaryButtonLabel}>招待リンクを用意する</Text>
-          </Pressable>
-          {inviteLink ? (
-            <Pressable
-              style={[styles.secondaryButton, preparingInvite && styles.buttonDisabled]}
-              disabled={preparingInvite}
-              onPress={() => {
-                void prepareInvite(true);
-              }}
-            >
-              <Text style={styles.secondaryButtonLabel}>再発行</Text>
-            </Pressable>
-          ) : null}
+          ))}
         </View>
-      </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -495,6 +491,10 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.muted,
   },
+  pendingMetaText: {
+    fontSize: 13,
+    color: colors.muted,
+  },
   memberRow: {
     flexDirection: 'row',
     gap: 12,
@@ -516,6 +516,16 @@ const styles = StyleSheet.create({
   memberBody: {
     flex: 1,
     gap: 2,
+  },
+  memberStatus: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.muted,
+  },
+  memberMetaLine: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.muted,
   },
   listCard: {
     padding: 14,
@@ -550,6 +560,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: colors.accent,
+    flexGrow: 1,
   },
   primaryButtonLabel: {
     color: '#fffdf8',
@@ -562,6 +573,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: colors.secondarySurface,
+    flexGrow: 1,
   },
   secondaryButtonLabel: {
     color: colors.ink,

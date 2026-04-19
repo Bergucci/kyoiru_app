@@ -253,21 +253,14 @@ export default function MonitoringTabScreen() {
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.hero}>
-          <Text style={styles.heroTitle}>見守り</Text>
+          <Text style={styles.heroTitle}>大切な人を、もう少しちゃんと見守る。</Text>
           <Text style={styles.heroText}>
             見守りプランにご加入いただくと、離れた家族の「今日いる」をやさしく確認できます。
           </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>今の状態</Text>
-          <Text style={styles.metaText}>
-            現在は見守りプラン未加入です。見守り機能は有料プラン加入後にご利用いただけます。
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.paywallTitle}>大切な人を、もう少しちゃんと見守る</Text>
+          <Text style={styles.paywallTitle}>見守りプラン</Text>
           <View style={styles.paywallPriceRow}>
             <Text style={styles.paywallPrice}>
               {subscriptionCopy?.priceDisplay ?? '¥980'}
