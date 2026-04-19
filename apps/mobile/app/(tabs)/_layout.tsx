@@ -34,7 +34,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="friends/index"
+        name="friends"
         options={{
           title: '友達',
           tabBarLabel: '友達',
