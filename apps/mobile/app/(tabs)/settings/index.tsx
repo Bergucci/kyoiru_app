@@ -1,4 +1,5 @@
 import { Redirect, useRouter } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
@@ -19,6 +20,10 @@ const supportMenuItems = [
   { label: 'アカウント削除', href: '/(tabs)/settings/account-delete' },
 ];
 
+function getInitial(value: string | null | undefined) {
+  return (value?.trim().charAt(0) || '今').toUpperCase();
+}
+
 export default function SettingsIndexScreen() {
   const router = useRouter();
   const { session, clearSession } = useSession();
@@ -31,6 +36,8 @@ export default function SettingsIndexScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
+  const profileInitial = getInitial(session.user.displayName || session.user.userId);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.hero}>
@@ -41,10 +48,20 @@ export default function SettingsIndexScreen() {
       </View>
 
       <View style={styles.profileCard}>
-        <Text style={styles.profileName}>
-          {session.user.displayName || '表示名未設定'}
-        </Text>
-        <Text style={styles.profileMeta}>@{session.user.userId}</Text>
+        <View style={styles.profileHeader}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarLabel}>{profileInitial}</Text>
+          </View>
+          <View style={styles.profileBody}>
+            <Text style={styles.profileName}>
+              {session.user.displayName || '表示名未設定'}
+            </Text>
+            <Text style={styles.profileMeta}>@{session.user.userId}</Text>
+          </View>
+          <View style={styles.profileBadge}>
+            <Text style={styles.profileBadgeLabel}>アプリ設定</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -53,13 +70,24 @@ export default function SettingsIndexScreen() {
           {primaryMenuItems.map((item) => (
             <Pressable
               key={item.href}
-              style={styles.menuItem}
+              style={[
+                styles.menuItem,
+                item.href !== primaryMenuItems[primaryMenuItems.length - 1]?.href &&
+                  styles.menuItemBorder,
+              ]}
               onPress={() => {
                 router.push(item.href as never);
               }}
             >
               <Text style={styles.menuLabel}>{item.label}</Text>
-              <Text style={styles.menuMeta}>開く</Text>
+              <View style={styles.menuTrailing}>
+                <Text style={styles.menuMeta}>開く</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={colors.hint}
+                />
+              </View>
             </Pressable>
           ))}
         </View>
@@ -71,13 +99,31 @@ export default function SettingsIndexScreen() {
           {supportMenuItems.map((item) => (
             <Pressable
               key={item.href}
-              style={styles.menuItem}
+              style={[
+                styles.menuItem,
+                item.href !== supportMenuItems[supportMenuItems.length - 1]?.href &&
+                  styles.menuItemBorder,
+              ]}
               onPress={() => {
                 router.push(item.href as never);
               }}
             >
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Text style={styles.menuMeta}>開く</Text>
+              <Text
+                style={[
+                  styles.menuLabel,
+                  item.href.endsWith('account-delete') && styles.dangerLabel,
+                ]}
+              >
+                {item.label}
+              </Text>
+              <View style={styles.menuTrailing}>
+                <Text style={styles.menuMeta}>開く</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={colors.hint}
+                />
+              </View>
             </Pressable>
           ))}
         </View>
@@ -100,23 +146,23 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     gap: 16,
-    backgroundColor: '#f6f1e7',
+    backgroundColor: colors.pageBg,
   },
   hero: {
     padding: 22,
     borderRadius: 24,
-    backgroundColor: '#4a4a5a',
+    backgroundColor: colors.settingsInk,
     gap: 8,
   },
   heroTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fffdf8',
+    color: colors.onDark,
   },
   heroText: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#e3e3ef',
+    color: colors.onSettingsMuted,
   },
   profileCard: {
     padding: 18,
@@ -124,7 +170,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 4,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft,
+  },
+  avatarLabel: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.accentStrong,
+  },
+  profileBody: {
+    flex: 1,
+    gap: 3,
   },
   profileName: {
     fontSize: 18,
@@ -135,6 +202,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted,
   },
+  profileBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.accentSoft,
+  },
+  profileBadgeLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accentStrong,
+  },
   section: {
     gap: 10,
   },
@@ -144,22 +222,35 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   menuList: {
-    gap: 10,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   menuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 16,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+  },
+  menuItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.nestedBorder,
   },
   menuLabel: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.ink,
+  },
+  dangerLabel: {
+    color: colors.danger,
+  },
+  menuTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   menuMeta: {
     color: colors.accent,
@@ -170,7 +261,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#ebe3d6',
+    backgroundColor: colors.secondarySurface,
   },
   logoutLabel: {
     color: colors.ink,

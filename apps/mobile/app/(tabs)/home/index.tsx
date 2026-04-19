@@ -176,7 +176,7 @@ export default function HomeTabScreen() {
         {loading ? (
           <ActivityIndicator color={colors.accent} />
         ) : (
-          <>
+          <View style={styles.statusPanel}>
             <Text style={styles.statusText}>
               状態: {toAliveStateLabel(today?.state ?? null)}
             </Text>
@@ -198,7 +198,7 @@ export default function HomeTabScreen() {
                 {today?.checkedIn ? '今日反応済み' : '今日いる'}
               </Text>
             </Pressable>
-          </>
+          </View>
         )}
       </View>
 
@@ -230,67 +230,69 @@ export default function HomeTabScreen() {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>グループ作成</Text>
-        <TextInput
-          value={groupName}
-          onChangeText={setGroupName}
-          placeholder="グループ名"
-          style={styles.input}
-        />
-        <View style={styles.segment}>
+        <View style={styles.nestedPanel}>
+          <TextInput
+            value={groupName}
+            onChangeText={setGroupName}
+            placeholder="グループ名"
+            style={styles.input}
+          />
+          <View style={styles.segment}>
+            <Pressable
+              style={[
+                styles.segmentButton,
+                groupType === 'friends' && styles.segmentButtonActive,
+              ]}
+              onPress={() => {
+                setGroupType('friends');
+              }}
+            >
+              <Text
+                style={[
+                  styles.segmentLabel,
+                  groupType === 'friends' && styles.segmentLabelActive,
+                ]}
+              >
+                友人・恋人
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.segmentButton,
+                groupType === 'family' && styles.segmentButtonActive,
+              ]}
+              onPress={() => {
+                setGroupType('family');
+              }}
+            >
+              <Text
+                style={[
+                  styles.segmentLabel,
+                  groupType === 'family' && styles.segmentLabelActive,
+                ]}
+              >
+                家族
+              </Text>
+            </Pressable>
+          </View>
+          <TextInput
+            value={initialMemberUserIds}
+            onChangeText={setInitialMemberUserIds}
+            placeholder="初期メンバー userId をカンマ区切りで入力 (任意)"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+          />
           <Pressable
-            style={[
-              styles.segmentButton,
-              groupType === 'friends' && styles.segmentButtonActive,
-            ]}
+            style={[styles.primaryButton, creatingGroup && styles.buttonDisabled]}
+            disabled={creatingGroup}
             onPress={() => {
-              setGroupType('friends');
+              void createGroup();
             }}
           >
-            <Text
-              style={[
-                styles.segmentLabel,
-                groupType === 'friends' && styles.segmentLabelActive,
-              ]}
-            >
-              友人・恋人
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.segmentButton,
-              groupType === 'family' && styles.segmentButtonActive,
-            ]}
-            onPress={() => {
-              setGroupType('family');
-            }}
-          >
-            <Text
-              style={[
-                styles.segmentLabel,
-                groupType === 'family' && styles.segmentLabelActive,
-              ]}
-            >
-              家族
-            </Text>
+            <Text style={styles.primaryButtonLabel}>グループを作成する</Text>
           </Pressable>
         </View>
-        <TextInput
-          value={initialMemberUserIds}
-          onChangeText={setInitialMemberUserIds}
-          placeholder="初期メンバー userId をカンマ区切りで入力 (任意)"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-        />
-        <Pressable
-          style={[styles.primaryButton, creatingGroup && styles.buttonDisabled]}
-          disabled={creatingGroup}
-          onPress={() => {
-            void createGroup();
-          }}
-        >
-          <Text style={styles.primaryButtonLabel}>グループを作成する</Text>
-        </Pressable>
       </View>
 
       <View style={styles.card}>
@@ -328,7 +330,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     gap: 16,
-    backgroundColor: '#f6f1e7',
+    backgroundColor: colors.pageBg,
   },
   hero: {
     padding: 22,
@@ -339,12 +341,12 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fffdf8',
+    color: colors.onDark,
   },
   heroText: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#d6e6dd',
+    color: colors.onAccentMuted,
   },
   card: {
     padding: 18,
@@ -372,6 +374,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.ink,
+  },
+  statusPanel: {
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: colors.accentTint,
+    gap: 8,
   },
   metaText: {
     fontSize: 14,
@@ -410,10 +418,18 @@ const styles = StyleSheet.create({
   input: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: '#ffffff',
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.white,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  nestedPanel: {
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: colors.nestedSurface,
+    borderWidth: 1,
+    borderColor: colors.nestedBorder,
+    gap: 10,
   },
   segment: {
     flexDirection: 'row',
@@ -428,7 +444,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   segmentButtonActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
   },
   segmentLabel: {
     color: colors.muted,
@@ -440,9 +456,9 @@ const styles = StyleSheet.create({
   groupCard: {
     padding: 16,
     borderRadius: 16,
-    backgroundColor: '#fcfaf4',
+    backgroundColor: colors.nestedSurface,
     borderWidth: 1,
-    borderColor: '#e2dccf',
+    borderColor: colors.nestedBorder,
     gap: 4,
   },
   groupTitle: {

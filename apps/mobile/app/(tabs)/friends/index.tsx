@@ -58,6 +58,10 @@ interface FriendInviteLinkResponse {
   lineShareUrl: string;
 }
 
+function getInitial(value: string | null | undefined) {
+  return (value?.trim().charAt(0) || '友').toUpperCase();
+}
+
 export default function FriendsTabScreen() {
   const { session } = useSession();
   const [friends, setFriends] = useState<FriendSummary[]>([]);
@@ -234,11 +238,20 @@ export default function FriendsTabScreen() {
                 );
               }}
             >
-              <Text style={styles.listTitle}>{item.friend.displayName}</Text>
-              <Text style={styles.metaText}>@{item.friend.userId}</Text>
-              <Text style={styles.metaText}>
-                友達になった日: {formatDateTime(item.friendedAt)}
-              </Text>
+              <View style={styles.memberRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarLabel}>
+                    {getInitial(item.friend.displayName || item.friend.userId)}
+                  </Text>
+                </View>
+                <View style={styles.memberBody}>
+                  <Text style={styles.listTitle}>{item.friend.displayName}</Text>
+                  <Text style={styles.metaText}>@{item.friend.userId}</Text>
+                  <Text style={styles.metaText}>
+                    友達になった日: {formatDateTime(item.friendedAt)}
+                  </Text>
+                </View>
+              </View>
             </Pressable>
           ))
         )}
@@ -266,8 +279,17 @@ export default function FriendsTabScreen() {
         {searching ? <ActivityIndicator color={colors.accent} /> : null}
         {searchResults.map((result) => (
           <View key={result.userId} style={styles.listCard}>
-            <Text style={styles.listTitle}>{result.displayName}</Text>
-            <Text style={styles.metaText}>@{result.userId}</Text>
+            <View style={styles.memberRow}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarLabel}>
+                  {getInitial(result.displayName || result.userId)}
+                </Text>
+              </View>
+              <View style={styles.memberBody}>
+                <Text style={styles.listTitle}>{result.displayName}</Text>
+                <Text style={styles.metaText}>@{result.userId}</Text>
+              </View>
+            </View>
             <Pressable
               style={styles.secondaryButton}
               onPress={() => {
@@ -289,11 +311,20 @@ export default function FriendsTabScreen() {
         ) : (
           incomingRequests.map((request) => (
             <View key={request.requestId} style={styles.listCard}>
-              <Text style={styles.listTitle}>{request.from.displayName}</Text>
-              <Text style={styles.metaText}>@{request.from.userId}</Text>
-              <Text style={styles.metaText}>
-                受信日時: {formatDateTime(request.createdAt)}
-              </Text>
+              <View style={styles.memberRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarLabel}>
+                    {getInitial(request.from.displayName || request.from.userId)}
+                  </Text>
+                </View>
+                <View style={styles.memberBody}>
+                  <Text style={styles.listTitle}>{request.from.displayName}</Text>
+                  <Text style={styles.metaText}>@{request.from.userId}</Text>
+                  <Text style={styles.metaText}>
+                    受信日時: {formatDateTime(request.createdAt)}
+                  </Text>
+                </View>
+              </View>
               <View style={styles.actionRow}>
                 <Pressable
                   style={styles.primaryButton}
@@ -326,11 +357,20 @@ export default function FriendsTabScreen() {
         ) : (
           outgoingRequests.map((request) => (
             <View key={request.requestId} style={styles.listCard}>
-              <Text style={styles.listTitle}>{request.to.displayName}</Text>
-              <Text style={styles.metaText}>@{request.to.userId}</Text>
-              <Text style={styles.metaText}>
-                送信日時: {formatDateTime(request.createdAt)}
-              </Text>
+              <View style={styles.memberRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarLabel}>
+                    {getInitial(request.to.displayName || request.to.userId)}
+                  </Text>
+                </View>
+                <View style={styles.memberBody}>
+                  <Text style={styles.listTitle}>{request.to.displayName}</Text>
+                  <Text style={styles.metaText}>@{request.to.userId}</Text>
+                  <Text style={styles.metaText}>
+                    送信日時: {formatDateTime(request.createdAt)}
+                  </Text>
+                </View>
+              </View>
               <Pressable
                 style={styles.secondaryButton}
                 onPress={() => {
@@ -351,9 +391,11 @@ export default function FriendsTabScreen() {
         </Text>
         {inviteLink ? (
           <>
-            <Text selectable style={styles.inviteUrl}>
-              {inviteLink.inviteUrl}
-            </Text>
+            <View style={styles.invitePanel}>
+              <Text selectable style={styles.inviteUrl}>
+                {inviteLink.inviteUrl}
+              </Text>
+            </View>
             <Text style={styles.metaText}>
               有効期限: {formatDateTime(inviteLink.expiresAt)}
             </Text>
@@ -408,7 +450,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     gap: 16,
-    backgroundColor: '#f6f1e7',
+    backgroundColor: colors.pageBg,
   },
   hero: {
     padding: 22,
@@ -419,12 +461,12 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fffdf8',
+    color: colors.onDark,
   },
   heroText: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#d6e6dd',
+    color: colors.onAccentMuted,
   },
   card: {
     padding: 18,
@@ -453,12 +495,34 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.muted,
   },
+  memberRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft,
+  },
+  avatarLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.accentStrong,
+  },
+  memberBody: {
+    flex: 1,
+    gap: 2,
+  },
   listCard: {
     padding: 14,
     borderRadius: 16,
-    backgroundColor: '#fcfaf4',
+    backgroundColor: colors.nestedSurface,
     borderWidth: 1,
-    borderColor: '#e2dccf',
+    borderColor: colors.nestedBorder,
     gap: 6,
   },
   listTitle: {
@@ -469,8 +533,8 @@ const styles = StyleSheet.create({
   input: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: '#ffffff',
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.white,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -497,14 +561,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#ebe3d6',
+    backgroundColor: colors.secondarySurface,
   },
   secondaryButtonLabel: {
     color: colors.ink,
     fontWeight: '700',
   },
+  invitePanel: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: colors.accentTint,
+  },
   inviteUrl: {
     color: colors.accentStrong,
+    fontSize: 13,
   },
   buttonDisabled: {
     opacity: 0.7,

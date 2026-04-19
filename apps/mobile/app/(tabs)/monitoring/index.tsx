@@ -84,6 +84,13 @@ interface FinalStageEmergencyContact {
   };
 }
 
+const planHighlights = [
+  '相手が「今日いる」かをそっと把握できます',
+  '反応がない時に、段階的にやさしく通知します',
+  '緊急連絡先を 1 件だけ登録できます',
+  '見守られる側は、いつでも同意を取り消せます',
+];
+
 export default function MonitoringTabScreen() {
   const router = useRouter();
   const { session } = useSession();
@@ -260,24 +267,31 @@ export default function MonitoringTabScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>見守りプランでできること</Text>
+          <Text style={styles.paywallTitle}>大切な人を、もう少しちゃんと見守る</Text>
+          <View style={styles.paywallPriceRow}>
+            <Text style={styles.paywallPrice}>
+              {subscriptionCopy?.priceDisplay ?? '¥980'}
+            </Text>
+            <Text style={styles.paywallCycle}>
+              {subscriptionCopy?.billingCycle ?? '/ 月'}
+            </Text>
+          </View>
           <Text style={styles.metaText}>
-            ・ 相手が「今日いる」かをそっと把握できます
+            {subscriptionCopy?.freeTrial ?? '初回 7 日間は無料。いつでも解約できます。'}
           </Text>
-          <Text style={styles.metaText}>
-            ・ 反応がないときは段階的にやさしく通知します
-          </Text>
-          <Text style={styles.metaText}>
-            ・ 最終段階では登録された緊急連絡先にアクセスできます
-          </Text>
-          {subscriptionCopy ? (
-            <>
-              <View style={styles.planBox}>
-                <Text style={styles.planName}>{subscriptionCopy.planName}</Text>
-                <Text style={styles.planPrice}>{subscriptionCopy.priceDisplay}</Text>
-                <Text style={styles.metaText}>{subscriptionCopy.freeTrial}</Text>
+          <View style={styles.paywallBulletList}>
+            {planHighlights.map((item) => (
+              <View key={item} style={styles.paywallBulletRow}>
+                <View style={styles.paywallBulletDot} />
+                <Text style={styles.paywallBulletText}>{item}</Text>
               </View>
-            </>
+            ))}
+          </View>
+          {subscriptionCopy ? (
+            <View style={styles.planBox}>
+              <Text style={styles.planName}>{subscriptionCopy.planName}</Text>
+              <Text style={styles.planPrice}>{subscriptionCopy.reviewSummary}</Text>
+            </View>
           ) : null}
           <Pressable
             style={styles.primaryButton}
@@ -285,7 +299,7 @@ export default function MonitoringTabScreen() {
               router.push('/(tabs)/settings/subscription-info' as never);
             }}
           >
-            <Text style={styles.primaryButtonLabel}>見守りプランの詳細を見る</Text>
+            <Text style={styles.primaryButtonLabel}>7 日間無料で試す</Text>
           </Pressable>
           <Pressable
             style={styles.secondaryButton}
@@ -295,6 +309,9 @@ export default function MonitoringTabScreen() {
           >
             <Text style={styles.secondaryButtonLabel}>サブスク管理へ</Text>
           </Pressable>
+          <Text style={styles.paywallFinePrint}>
+            監視ではなく、反応がない時に気づきやすくするための機能です。
+          </Text>
         </View>
       </ScrollView>
     );
@@ -517,7 +534,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     gap: 16,
-    backgroundColor: '#f6f1e7',
+    backgroundColor: colors.pageBg,
   },
   loadingContainer: {
     flex: 1,
@@ -533,12 +550,12 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f8fcff',
+    color: colors.onDark,
   },
   heroText: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#d5e6ee',
+    color: colors.onSkyMuted,
   },
   card: {
     padding: 18,
@@ -563,12 +580,54 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.muted,
   },
+  paywallTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  paywallPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  paywallPrice: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  paywallCycle: {
+    fontSize: 14,
+    color: colors.muted,
+    marginBottom: 4,
+  },
+  paywallBulletList: {
+    gap: 8,
+    marginTop: 2,
+  },
+  paywallBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  paywallBulletDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: colors.accent,
+    marginTop: 8,
+  },
+  paywallBulletText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 21,
+    color: colors.ink,
+  },
   listCard: {
     padding: 14,
     borderRadius: 16,
-    backgroundColor: '#fcfaf4',
+    backgroundColor: colors.nestedSurface,
     borderWidth: 1,
-    borderColor: '#e2dccf',
+    borderColor: colors.nestedBorder,
     gap: 6,
   },
   actionRow: {
@@ -579,8 +638,8 @@ const styles = StyleSheet.create({
   input: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: '#ffffff',
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.white,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -602,7 +661,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#ebe3d6',
+    backgroundColor: colors.secondarySurface,
   },
   secondaryButtonLabel: {
     color: colors.ink,
@@ -616,7 +675,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     padding: 12,
     borderRadius: 14,
-    backgroundColor: '#eef5f1',
+    backgroundColor: colors.accentTint,
     gap: 4,
   },
   contactTitle: {
@@ -626,7 +685,7 @@ const styles = StyleSheet.create({
   planBox: {
     padding: 14,
     borderRadius: 14,
-    backgroundColor: '#eef5f1',
+    backgroundColor: colors.accentTint,
     gap: 4,
   },
   planName: {
@@ -635,9 +694,15 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   planPrice: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.accentStrong,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.muted,
+  },
+  paywallFinePrint: {
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign: 'center',
+    color: colors.hint,
   },
   buttonDisabled: {
     opacity: 0.7,
