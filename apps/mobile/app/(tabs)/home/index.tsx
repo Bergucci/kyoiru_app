@@ -37,7 +37,13 @@ interface CheckinHistoryResponse {
   }>;
 }
 
-const moodOptions = ['😊 いい感じ', '🙂 ふつう', '😴 ねむい', '😢 しんどい', '🤒 つらい'];
+const moodOptions: { label: string; value: string }[] = [
+  { label: '😊 元気', value: '元気' },
+  { label: '🙂 ふつう', value: 'ふつう' },
+  { label: '😴 眠い', value: '眠い' },
+  { label: '😓 忙しい', value: '忙しい' },
+  { label: '😢 しんどい', value: 'しんどい' },
+];
 
 export default function HomeTabScreen() {
   const router = useRouter();
@@ -211,17 +217,17 @@ export default function HomeTabScreen() {
           <View style={styles.chipWrap}>
             {moodOptions.map((mood) => (
               <Pressable
-                key={mood}
+                key={mood.value}
                 style={[
                   styles.chip,
                   submittingMood && styles.buttonDisabled,
                 ]}
                 disabled={submittingMood}
                 onPress={() => {
-                  void submitMood(mood);
+                  void submitMood(mood.value);
                 }}
               >
-                <Text style={styles.chipLabel}>{mood}</Text>
+                <Text style={styles.chipLabel}>{mood.label}</Text>
               </Pressable>
             ))}
           </View>
