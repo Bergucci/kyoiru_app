@@ -22,7 +22,7 @@ const primaryMenuItems = [
   },
   {
     label: 'サブスクリプション',
-    detail: '見守り / 有効',
+    detail: '管理',
     href: '/(tabs)/settings/subscription-management',
   },
 ];
@@ -75,9 +75,6 @@ export default function SettingsIndexScreen() {
               {session.user.displayName || '表示名未設定'}
             </Text>
             <Text style={styles.profileMeta}>{session.user.userId}</Text>
-          </View>
-          <View style={styles.profileBadge}>
-            <Text style={styles.profileBadgeLabel}>見守り中</Text>
           </View>
         </View>
       </View>
@@ -198,17 +195,6 @@ const styles = StyleSheet.create({
   profileMeta: {
     fontSize: 13,
     color: colors.muted,
-  },
-  profileBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: colors.accentSoft,
-  },
-  profileBadgeLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.accentStrong,
   },
   menuList: {
     borderRadius: 20,
