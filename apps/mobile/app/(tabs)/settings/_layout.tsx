@@ -13,7 +13,10 @@ export default function SettingsStackLayout() {
         options={{ title: 'サブスク管理' }}
       />
       <Stack.Screen name="help" options={{ title: 'ヘルプ' }} />
-      <Stack.Screen name="legal" options={{ title: '法務リンク' }} />
+      <Stack.Screen name="legal" options={{ title: '利用規約・プライバシー' }} />
+      <Stack.Screen name="privacy-policy" options={{ title: 'プライバシーポリシー' }} />
+      <Stack.Screen name="terms" options={{ title: '利用規約' }} />
+      <Stack.Screen name="commerce-disclosure" options={{ title: '特定商取引法に基づく表記' }} />
       <Stack.Screen
         name="subscription-info"
         options={{ title: '見守りプランについて' }}
