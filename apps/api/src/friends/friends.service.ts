@@ -19,6 +19,7 @@ import type { User } from '@prisma/client';
 import {
   checkFriendRequestConstraints,
   getBusinessDayStartUtc,
+  toJstParts,
 } from '@kyoiru/domain';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { SearchUserDto } from './dto/search-user.dto.js';
@@ -65,6 +66,8 @@ export interface FriendRequestListItem {
 export interface FriendListItem {
   friendshipId: string;
   friendedAt: Date;
+  latestCheckinAt: Date | null;
+  latestMood: string | null;
   friend: FriendRequestUserSummary;
 }
 
@@ -369,6 +372,11 @@ export class FriendsService {
   }
 
   async listFriends(currentUser: User): Promise<FriendListItem[]> {
+    const now = new Date();
+    const bds = getBusinessDayStartUtc(now);
+    const { year, month, day } = toJstParts(bds);
+    const businessDateJst = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
     const friendships = await this.prisma.friendship.findMany({
       where: {
         OR: [{ userLowId: currentUser.id }, { userHighId: currentUser.id }],
@@ -398,6 +406,31 @@ export class FriendsService {
       },
     });
 
+    const friendUserIds = friendships.map((f) =>
+      f.userLow.id === currentUser.id ? f.userHigh.id : f.userLow.id,
+    );
+
+    const [checkins, moodStamps] = await Promise.all([
+      this.prisma.dailyCheckin.findMany({
+        where: {
+          userId: { in: friendUserIds },
+          businessDateJst,
+        },
+        select: { userId: true, checkedInAt: true },
+      }),
+      this.prisma.dailyMoodStamp.findMany({
+        where: {
+          userId: { in: friendUserIds },
+          businessDateJst,
+          deletedAt: null,
+        },
+        select: { userId: true, mood: true },
+      }),
+    ]);
+
+    const checkinByUserId = new Map(checkins.map((c) => [c.userId, c.checkedInAt]));
+    const moodByUserId = new Map(moodStamps.map((m) => [m.userId, m.mood]));
+
     return friendships.map((friendship) => {
       const friend =
         friendship.userLow.id === currentUser.id
@@ -407,6 +440,8 @@ export class FriendsService {
       return {
         friendshipId: friendship.id,
         friendedAt: friendship.createdAt,
+        latestCheckinAt: checkinByUserId.get(friend.id) ?? null,
+        latestMood: moodByUserId.get(friend.id) ?? null,
         friend: {
           userId: friend.userId,
           displayName: friend.displayName,
