@@ -1,9 +1,12 @@
+import { join } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { ValidationPipe } from '@nestjs/common';
+import multipart from '@fastify/multipart';
+import staticFiles from '@fastify/static';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
@@ -11,6 +14,12 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter(),
   );
+
+  await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } });
+  await app.register(staticFiles, {
+    root: join(__dirname, '..', 'uploads'),
+    prefix: '/uploads/',
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),

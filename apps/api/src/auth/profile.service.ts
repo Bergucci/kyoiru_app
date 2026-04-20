@@ -81,6 +81,13 @@ export class ProfileService {
     }
   }
 
+  async updateAvatarUrl(user: User, avatarUrl: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { avatarUrl },
+    });
+  }
+
   async updateProfile(user: User, dto: UpdateProfileDto): Promise<UserResponse> {
     const updated = await this.prisma.user.update({
       where: { id: user.id },

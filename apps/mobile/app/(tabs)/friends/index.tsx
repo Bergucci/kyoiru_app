@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -62,6 +63,18 @@ interface FriendInviteLinkResponse {
 
 function getInitial(value: string | null | undefined) {
   return (value?.trim().charAt(0) || '友').toUpperCase();
+}
+
+function Avatar({ url, name, size = 44 }: { url: string | null; name: string; size?: number }) {
+  const radius = size / 2;
+  if (url) {
+    return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: radius }} />;
+  }
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: radius }]}>
+      <Text style={styles.avatarLabel}>{getInitial(name)}</Text>
+    </View>
+  );
 }
 
 function formatFriendActivity(item: FriendSummary) {
@@ -297,11 +310,7 @@ export default function FriendsTabScreen() {
           {searchResults.map((result) => (
             <View key={result.userId} style={styles.listCard}>
               <View style={styles.memberRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>
-                    {getInitial(result.displayName || result.userId)}
-                  </Text>
-                </View>
+                <Avatar url={result.avatarUrl} name={result.displayName || result.userId} />
                 <View style={styles.memberBody}>
                   <Text style={styles.listTitle}>{result.displayName}</Text>
                   <Text style={styles.metaText}>@{result.userId}</Text>
@@ -340,11 +349,7 @@ export default function FriendsTabScreen() {
                 }}
               >
                 <View style={styles.memberRow}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarLabel}>
-                      {getInitial(item.friend.displayName || item.friend.userId)}
-                    </Text>
-                  </View>
+                  <Avatar url={item.friend.avatarUrl} name={item.friend.displayName || item.friend.userId} />
                   <View style={styles.memberBody}>
                     <Text style={styles.listTitle}>{item.friend.displayName}</Text>
                     <Text style={styles.memberStatus}>

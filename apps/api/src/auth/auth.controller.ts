@@ -1,3 +1,7 @@
+import { createWriteStream } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import {
   Body,
   Controller,
@@ -95,6 +99,33 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@Request() req: AuthRequest) {
     return this.authService.me(req.user);
+  }
+
+  @Post('profile/avatar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async uploadAvatar(@Request() req: AuthRequest) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const file = await (req as any).file();
+    if (!file) {
+      return { avatarUrl: null };
+    }
+
+    const uploadsDir = join(__dirname, '..', '..', 'uploads', 'avatars');
+    await mkdir(uploadsDir, { recursive: true });
+
+    const ext = file.mimetype === 'image/png' ? 'png' : 'jpg';
+    const filename = `${req.user.id}.${ext}`;
+    const filePath = join(uploadsDir, filename);
+
+    await pipeline(file.file, createWriteStream(filePath));
+
+    const baseUrl = process.env.API_BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+    const avatarUrl = `${baseUrl}/uploads/avatars/${filename}`;
+
+    await this.profileService.updateAvatarUrl(req.user, avatarUrl);
+
+    return { avatarUrl };
   }
 
   @Patch('profile')

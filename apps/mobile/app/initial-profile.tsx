@@ -51,6 +51,25 @@ export default function InitialProfileScreen() {
     }
   };
 
+  const uploadAvatar = async (localUri: string): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: localUri,
+      type: 'image/jpeg',
+      name: 'avatar.jpg',
+    } as unknown as Blob);
+
+    const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
+    const response = await fetch(`${API_URL}/auth/profile/avatar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+      body: formData,
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { avatarUrl: string | null };
+    return data.avatarUrl;
+  };
+
   const submit = async () => {
     if (!displayName.trim() || !userId.trim()) {
       Alert.alert('入力不足', '表示名とユーザーIDを入力してください。');
@@ -59,12 +78,19 @@ export default function InitialProfileScreen() {
 
     try {
       setSubmitting(true);
+
+      let avatarUrl: string | null = null;
+      if (avatarUri) {
+        avatarUrl = await uploadAvatar(avatarUri);
+      }
+
       const response = await apiRequest<SessionUser>('/auth/initial-profile', {
         method: 'PATCH',
         token: session.accessToken,
         body: {
           displayName: displayName.trim(),
           userId: userId.trim(),
+          ...(avatarUrl ? { avatarUrl } : {}),
         },
       });
 

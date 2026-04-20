@@ -1,6 +1,6 @@
 import { Redirect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 
@@ -68,7 +68,11 @@ export default function SettingsIndexScreen() {
       <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarLabel}>{profileInitial}</Text>
+            {session.user.avatarUrl ? (
+              <Image source={{ uri: session.user.avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarLabel}>{profileInitial}</Text>
+            )}
           </View>
           <View style={styles.profileBody}>
             <Text style={styles.profileName}>
@@ -177,6 +181,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accentSoft,
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   avatarLabel: {
     fontSize: 22,
