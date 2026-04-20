@@ -12,7 +12,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
 import { formatDateTime } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
@@ -223,8 +222,8 @@ export default function FriendsTabScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <ScrollView
+    <ScrollView
+      style={styles.screen}
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -419,8 +418,7 @@ export default function FriendsTabScreen() {
             ))}
           </View>
         ) : null}
-      </ScrollView>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
