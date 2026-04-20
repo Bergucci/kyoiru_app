@@ -9,8 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
-import { toGroupNotificationLevelLabel } from '../../../src/lib/format';
+import { toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 
@@ -31,11 +31,34 @@ interface GroupNotificationCard extends GroupSummary {
   notificationLevel: 'loose' | 'normal' | 'caring';
 }
 
+const LEVELS: {
+  value: 'loose' | 'normal' | 'caring';
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: 'loose',
+    label: 'ゆるい',
+    description: '長時間未反応でもまとめて通知',
+  },
+  {
+    value: 'normal',
+    label: 'ふつう',
+    description: '標準的なタイミングで通知',
+  },
+  {
+    value: 'caring',
+    label: '気にかける',
+    description: '未反応が続いたら早めに通知',
+  },
+];
+
 export default function NotificationSettingsScreen() {
   const { session } = useSession();
   const [groups, setGroups] = useState<GroupNotificationCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingGroupId, setSavingGroupId] = useState<string | null>(null);
+  const { request } = useApi();
 
   useEffect(() => {
     if (session?.accessToken) {
@@ -51,22 +74,16 @@ export default function NotificationSettingsScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
-  const currentSession = session;
-
   async function loadNotificationSettings() {
     try {
       setLoading(true);
-      const groupResponse = await apiRequest<GroupSummary[]>('/groups', {
-        token: currentSession.accessToken,
-      });
+      const groupResponse = await request<GroupSummary[]>('/groups', {});
 
       const notificationResponses = await Promise.all(
         groupResponse.map((group) =>
-          apiRequest<GroupNotificationSettings>(
+          request<GroupNotificationSettings>(
             `/groups/${group.groupId}/notification-settings`,
-            {
-              token: currentSession.accessToken,
-            },
+            {},
           ),
         ),
       );
@@ -90,17 +107,10 @@ export default function NotificationSettingsScreen() {
   ) => {
     try {
       setSavingGroupId(groupId);
-      const response = await apiRequest<GroupNotificationSettings>(
+      const response = await request<GroupNotificationSettings>(
         `/groups/${groupId}/notification-settings`,
-        {
-          method: 'PATCH',
-          token: currentSession.accessToken,
-          body: {
-            notificationLevel,
-          },
-        },
+        { method: 'PATCH', body: { notificationLevel } },
       );
-
       setGroups((current) =>
         current.map((group) =>
           group.groupId === groupId
@@ -117,54 +127,61 @@ export default function NotificationSettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>通知設定</Text>
-        <Text style={styles.body}>
-          source-spec に合わせ、通知温度感はグループ単位で管理します。
+      <View style={styles.infoCard}>
+        <Text style={styles.infoText}>
+          グループごとに通知の頻度を設定できます。
+          メンバーの「今日いる」未反応が続いたとき、どれだけ早く知らせるかを選んでください。
         </Text>
       </View>
 
-      <View style={styles.card}>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : groups.length === 0 ? (
-          <Text style={styles.body}>所属グループがありません。</Text>
-        ) : (
-          groups.map((group) => (
-            <View key={group.groupId} style={styles.groupCard}>
-              <Text style={styles.groupTitle}>{group.name}</Text>
-              <Text style={styles.body}>
-                現在値: {toGroupNotificationLevelLabel(group.notificationLevel)}
-              </Text>
-              <View style={styles.segment}>
-                {(['loose', 'normal', 'caring'] as const).map((level) => (
+      {loading ? (
+        <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
+      ) : groups.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>
+            所属グループがありません。{'\n'}グループを作成すると通知設定が表示されます。
+          </Text>
+        </View>
+      ) : (
+        groups.map((group) => (
+          <View key={group.groupId} style={styles.groupCard}>
+            <Text style={styles.groupName}>{group.name}</Text>
+            <Text style={styles.groupMeta}>{group.memberCount}人のメンバー</Text>
+
+            <View style={styles.levelList}>
+              {LEVELS.map((level) => {
+                const isActive = group.notificationLevel === level.value;
+                const isSaving = savingGroupId === group.groupId;
+                return (
                   <Pressable
-                    key={level}
-                    style={[
-                      styles.segmentButton,
-                      group.notificationLevel === level && styles.segmentButtonActive,
-                    ]}
-                    disabled={savingGroupId === group.groupId}
+                    key={level.value}
+                    style={[styles.levelRow, isActive && styles.levelRowActive]}
+                    disabled={isSaving}
                     onPress={() => {
-                      void updateNotificationLevel(group.groupId, level);
+                      void updateNotificationLevel(group.groupId, level.value);
                     }}
                   >
-                    <Text
-                      style={[
-                        styles.segmentLabel,
-                        group.notificationLevel === level &&
-                          styles.segmentLabelActive,
-                      ]}
-                    >
-                      {toGroupNotificationLevelLabel(level)}
-                    </Text>
+                    <View style={styles.levelLeft}>
+                      <View style={[styles.radio, isActive && styles.radioActive]}>
+                        {isActive && <View style={styles.radioDot} />}
+                      </View>
+                      <View style={styles.levelText}>
+                        <Text style={[styles.levelLabel, isActive && styles.levelLabelActive]}>
+                          {level.label}
+                        </Text>
+                        <Text style={styles.levelDescription}>{level.description}</Text>
+                      </View>
+                    </View>
+                    {isSaving && savingGroupId === group.groupId && isActive && (
+                      <ActivityIndicator size="small" color={colors.accent} />
+                    )}
                   </Pressable>
-                ))}
-              </View>
+                );
+              })}
             </View>
-          ))
-        )}
-      </View>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -173,9 +190,33 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     gap: 16,
-    backgroundColor: '#f6f1e7',
+    backgroundColor: colors.pageBg,
   },
-  card: {
+  infoCard: {
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.accentSoft,
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: colors.accentStrong,
+  },
+  emptyCard: {
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: colors.muted,
+    textAlign: 'center',
+  },
+  groupCard: {
     padding: 18,
     borderRadius: 20,
     backgroundColor: colors.surface,
@@ -183,46 +224,72 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
   },
-  title: {
-    fontSize: 24,
+  groupName: {
+    fontSize: 18,
     fontWeight: '700',
     color: colors.ink,
   },
-  body: {
-    fontSize: 14,
-    lineHeight: 21,
+  groupMeta: {
+    fontSize: 13,
     color: colors.muted,
+    marginTop: -8,
   },
-  groupCard: {
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: '#fcfaf4',
-    borderWidth: 1,
-    borderColor: '#e2dccf',
-    gap: 10,
-  },
-  groupTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  segment: {
+  levelList: {
     gap: 8,
   },
-  segmentButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
     borderRadius: 14,
-    backgroundColor: '#efe7d8',
+    borderWidth: 1.5,
+    borderColor: colors.nestedBorder,
+    backgroundColor: colors.nestedSurface,
   },
-  segmentButtonActive: {
-    backgroundColor: colors.accentSoft,
+  levelRowActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentTint,
   },
-  segmentLabel: {
-    color: colors.ink,
+  levelLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.hint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioActive: {
+    borderColor: colors.accent,
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.accent,
+  },
+  levelText: {
+    flex: 1,
+    gap: 2,
+  },
+  levelLabel: {
+    fontSize: 15,
     fontWeight: '600',
+    color: colors.ink,
   },
-  segmentLabelActive: {
+  levelLabelActive: {
     color: colors.accentStrong,
+  },
+  levelDescription: {
+    fontSize: 12,
+    color: colors.muted,
+    lineHeight: 18,
   },
 });

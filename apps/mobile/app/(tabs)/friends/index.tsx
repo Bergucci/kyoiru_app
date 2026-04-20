@@ -6,17 +6,18 @@ import {
   Image,
   Pressable,
   RefreshControl,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import { resolveMediaUrl, toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import { formatDateTime } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
 
 interface FriendSummary {
   friendshipId: string;
@@ -67,8 +68,9 @@ function getInitial(value: string | null | undefined) {
 
 function Avatar({ url, name, size = 44 }: { url: string | null; name: string; size?: number }) {
   const radius = size / 2;
-  if (url) {
-    return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: radius }} />;
+  const resolved = resolveMediaUrl(url);
+  if (resolved) {
+    return <Image source={{ uri: resolved }} style={{ width: size, height: size, borderRadius: radius }} />;
   }
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: radius }]}>
@@ -100,7 +102,6 @@ export default function FriendsTabScreen() {
   useEffect(() => {
     if (session?.accessToken) {
       void loadFriendsTab();
-      void prepareInvite(false);
     }
   }, [session?.accessToken]);
 
@@ -113,6 +114,7 @@ export default function FriendsTabScreen() {
   }
 
   const currentSession = session;
+  const { request } = useApi();
 
   async function loadFriendsTab(isPullRefresh = false) {
     try {
@@ -122,15 +124,9 @@ export default function FriendsTabScreen() {
         setLoading(true);
       }
       const [friendsResponse, incoming, outgoing] = await Promise.all([
-        apiRequest<FriendSummary[]>('/friends', {
-          token: currentSession.accessToken,
-        }),
-        apiRequest<FriendRequestListItem[]>('/friends/requests/incoming', {
-          token: currentSession.accessToken,
-        }),
-        apiRequest<FriendRequestListItem[]>('/friends/requests/outgoing', {
-          token: currentSession.accessToken,
-        }),
+        request<FriendSummary[]>('/friends', {}),
+        request<FriendRequestListItem[]>('/friends/requests/incoming', {}),
+        request<FriendRequestListItem[]>('/friends/requests/outgoing', {}),
       ]);
       setFriends(friendsResponse);
       setIncomingRequests(incoming);
@@ -151,11 +147,9 @@ export default function FriendsTabScreen() {
 
     try {
       setSearching(true);
-      const results = await apiRequest<UserSearchResult[]>(
+      const results = await request<UserSearchResult[]>(
         `/friends/search?userId=${encodeURIComponent(searchQuery.trim())}`,
-        {
-          token: currentSession.accessToken,
-        },
+        {},
       );
       setSearchResults(results);
     } catch (error) {
@@ -167,9 +161,8 @@ export default function FriendsTabScreen() {
 
   const sendRequest = async (targetUserId: string) => {
     try {
-      await apiRequest('/friends/requests', {
+      await request('/friends/requests', {
         method: 'POST',
-        token: currentSession.accessToken,
         body: { targetUserId },
       });
       setSearchQuery('');
@@ -182,9 +175,8 @@ export default function FriendsTabScreen() {
 
   const acceptRequest = async (requestId: string) => {
     try {
-      await apiRequest(`/friends/requests/${requestId}/accept`, {
+      await request(`/friends/requests/${requestId}/accept`, {
         method: 'POST',
-        token: currentSession.accessToken,
       });
       await loadFriendsTab();
     } catch (error) {
@@ -194,9 +186,8 @@ export default function FriendsTabScreen() {
 
   const rejectRequest = async (requestId: string) => {
     try {
-      await apiRequest(`/friends/requests/${requestId}/reject`, {
+      await request(`/friends/requests/${requestId}/reject`, {
         method: 'POST',
-        token: currentSession.accessToken,
       });
       await loadFriendsTab();
     } catch (error) {
@@ -206,9 +197,8 @@ export default function FriendsTabScreen() {
 
   const cancelRequest = async (requestId: string) => {
     try {
-      await apiRequest(`/friends/requests/${requestId}/cancel`, {
+      await request(`/friends/requests/${requestId}/cancel`, {
         method: 'POST',
-        token: currentSession.accessToken,
       });
       await loadFriendsTab();
     } catch (error) {
@@ -219,11 +209,10 @@ export default function FriendsTabScreen() {
   const prepareInvite = async (reissue = false) => {
     try {
       setPreparingInvite(true);
-      const response = await apiRequest<FriendInviteLinkResponse>(
+      const response = await request<FriendInviteLinkResponse>(
         reissue ? '/friends/invite-links/reissue' : '/friends/invite-links',
         {
           method: 'POST',
-          token: currentSession.accessToken,
         },
       );
       setInviteLink(response);
@@ -235,8 +224,8 @@ export default function FriendsTabScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.screen}
+    <KeyboardAwareScrollView
+      outerStyle={styles.screen}
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -246,13 +235,6 @@ export default function FriendsTabScreen() {
           />
         }
       >
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>友達</Text>
-          <Text style={styles.heroText}>
-            「今日いる」を共有できる相手をここで管理します。
-          </Text>
-        </View>
-
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>招待リンク</Text>
           <Text style={styles.metaText}>
@@ -268,30 +250,56 @@ export default function FriendsTabScreen() {
               <View style={styles.actionRow}>
                 <Pressable
                   style={styles.primaryButton}
-                  onPress={() => {
-                    void Share.share({ message: inviteLink.shareText });
-                  }}
+                  onPress={() => { void Share.share({ message: inviteLink.shareText }); }}
                 >
                   <Text style={styles.primaryButtonLabel}>リンクを共有</Text>
                 </Pressable>
                 <Pressable
                   style={styles.secondaryButton}
-                  onPress={() => {
-                    void Share.share({ message: inviteLink.inviteUrl });
-                  }}
+                  onPress={() => { void Share.share({ message: inviteLink.inviteUrl }); }}
                 >
                   <Text style={styles.secondaryButtonLabel}>コピー</Text>
                 </Pressable>
               </View>
+              <View style={styles.actionRow}>
+                <Pressable
+                  style={[styles.secondaryButton, preparingInvite && styles.buttonDisabled]}
+                  disabled={preparingInvite}
+                  onPress={() => { void prepareInvite(true); }}
+                >
+                  <Text style={styles.secondaryButtonLabel}>再発行</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => { setInviteLink(null); }}
+                >
+                  <Text style={styles.secondaryButtonLabel}>閉じる</Text>
+                </Pressable>
+              </View>
             </>
-          ) : null}
+          ) : (
+            <Pressable
+              style={[styles.primaryButton, preparingInvite && styles.buttonDisabled]}
+              disabled={preparingInvite}
+              onPress={() => { void prepareInvite(false); }}
+            >
+              {preparingInvite ? (
+                <ActivityIndicator color="#fffdf8" />
+              ) : (
+                <Text style={styles.primaryButtonLabel}>招待リンクを作成</Text>
+              )}
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>友達追加</Text>
           <TextInput
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              if (!text.trim()) setSearchResults([]);
+            }}
             placeholder="userId を入力"
             autoCapitalize="none"
             autoCorrect={false}
@@ -307,25 +315,42 @@ export default function FriendsTabScreen() {
             <Text style={styles.primaryButtonLabel}>検索する</Text>
           </Pressable>
           {searching ? <ActivityIndicator color={colors.accent} /> : null}
-          {searchResults.map((result) => (
-            <View key={result.userId} style={styles.listCard}>
-              <View style={styles.memberRow}>
-                <Avatar url={result.avatarUrl} name={result.displayName || result.userId} />
-                <View style={styles.memberBody}>
-                  <Text style={styles.listTitle}>{result.displayName}</Text>
-                  <Text style={styles.metaText}>@{result.userId}</Text>
+          {searchResults.map((result) => {
+            const isFriend = friends.some((f) => f.friend.userId === result.userId);
+            const isPending = outgoingRequests.some((r) => r.to.userId === result.userId);
+            const isSelf = result.userId === currentSession.user.userId;
+            return (
+              <View key={result.userId} style={styles.listCard}>
+                <View style={styles.memberRow}>
+                  <Avatar url={result.avatarUrl} name={result.displayName || result.userId} />
+                  <View style={styles.memberBody}>
+                    <Text style={styles.listTitle}>{result.displayName}</Text>
+                    <Text style={styles.metaText}>@{result.userId}</Text>
+                  </View>
                 </View>
+                {isSelf ? (
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>自分のアカウント</Text>
+                  </View>
+                ) : isFriend ? (
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>すでに友達です</Text>
+                  </View>
+                ) : isPending ? (
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>申請済み</Text>
+                  </View>
+                ) : (
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={() => { void sendRequest(result.userId); }}
+                  >
+                    <Text style={styles.secondaryButtonLabel}>友達申請を送る</Text>
+                  </Pressable>
+                )}
               </View>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => {
-                  void sendRequest(result.userId);
-                }}
-              >
-                <Text style={styles.secondaryButtonLabel}>友達申請を送る</Text>
-              </Pressable>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <View style={styles.card}>
@@ -423,7 +448,7 @@ export default function FriendsTabScreen() {
             ))}
           </View>
         ) : null}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -572,5 +597,17 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  statusBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.nestedBorder,
+  },
+  statusBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.muted,
   },
 });

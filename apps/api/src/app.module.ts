@@ -8,11 +8,14 @@ import { AuthModule } from './auth/auth.module.js';
 import { FriendsModule } from './friends/friends.module.js';
 import { GroupsModule } from './groups/groups.module.js';
 import { MeModule } from './me/me.module.js';
+import { MoodStampsModule } from './mood-stamps/mood-stamps.module.js';
+import { DailyPromptsModule } from './daily-prompts/daily-prompts.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { MonitoringModule } from './monitoring/monitoring.module.js';
 import { LegalModule } from './legal/legal.module.js';
 import { AccountModule } from './account/account.module.js';
+import { ContactModule } from './contact/contact.module.js';
 
 @Module({
   imports: [
@@ -23,11 +26,14 @@ import { AccountModule } from './account/account.module.js';
     FriendsModule,
     GroupsModule,
     MeModule,
+    MoodStampsModule,
+    DailyPromptsModule,
     NotificationsModule,
     BillingModule,
     MonitoringModule,
     LegalModule,
     AccountModule,
+    ContactModule,
   ],
   controllers: [AppController],
   providers: [AppService],

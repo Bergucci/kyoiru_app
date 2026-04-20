@@ -5,18 +5,32 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../../src/lib/api';
+import { toApiErrorMessage } from '../../../../src/lib/api';
+import { useApi } from '../../../../src/lib/use-api';
 import {
   formatDateTime,
   toAliveStateLabel,
   toGroupTypeLabel,
 } from '../../../../src/lib/format';
+import {
+  REACTIONS,
+  REACTION_BY_TYPE,
+  type ReactionType,
+} from '../../../../src/lib/reactions';
+import { getPromptDefinition } from '../../../../src/lib/prompt-pool';
 import { useSession } from '../../../../src/session/session-context';
 import { colors } from '../../../../src/ui/theme';
+
+interface MoodReactionsView {
+  total: number;
+  byType: Partial<Record<ReactionType, number>>;
+  myReaction: ReactionType | null;
+}
 
 interface GroupDetailResponse {
   groupId: string;
@@ -30,8 +44,24 @@ interface GroupDetailResponse {
     state?: string;
     lastCheckedInAt?: string | null;
     mood?: string | null;
+    moodStampId?: string | null;
+    moodReactions?: MoodReactionsView | null;
     isInteractive: boolean;
   }>;
+}
+
+interface DailyPromptAnswerView {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  choiceKey: string;
+}
+
+interface DailyPromptResponse {
+  promptKey: string;
+  businessDateJst: string;
+  answers: DailyPromptAnswerView[];
+  myAnswer: string | null;
 }
 
 const moodOptions = ['😊 いい感じ', '🙂 ふつう', '😴 ねむい', '😢 しんどい', '🤒 つらい'];
@@ -40,9 +70,22 @@ export default function GroupDetailScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { session } = useSession();
   const [group, setGroup] = useState<GroupDetailResponse | null>(null);
+  const [dailyPrompt, setDailyPrompt] = useState<DailyPromptResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
   const [submittingMood, setSubmittingMood] = useState(false);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+  const [submittingReactionFor, setSubmittingReactionFor] = useState<
+    string | null
+  >(null);
+  const [submittingPromptChoice, setSubmittingPromptChoice] = useState<
+    string | null
+  >(null);
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (session?.accessToken && groupId) {
@@ -58,15 +101,18 @@ export default function GroupDetailScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
+  const { request } = useApi();
   const currentSession = session;
 
   async function loadGroup() {
     try {
       setLoading(true);
-      const response = await apiRequest<GroupDetailResponse>(`/groups/${groupId}`, {
-        token: currentSession.accessToken,
-      });
-      setGroup(response);
+      const [detail, prompt] = await Promise.all([
+        request<GroupDetailResponse>(`/groups/${groupId}`, {}),
+        request<DailyPromptResponse>(`/groups/${groupId}/daily-prompt`, {}),
+      ]);
+      setGroup(detail);
+      setDailyPrompt(prompt);
     } catch (error) {
       Alert.alert('グループ詳細の取得に失敗しました', toApiErrorMessage(error));
     } finally {
@@ -105,9 +151,8 @@ export default function GroupDetailScreen() {
   const submitCheckin = async () => {
     try {
       setSubmittingCheckin(true);
-      await apiRequest('/me/checkins/today', {
+      await request('/me/checkins/today', {
         method: 'POST',
-        token: currentSession.accessToken,
       });
       await loadGroup();
     } catch (error) {
@@ -117,12 +162,26 @@ export default function GroupDetailScreen() {
     }
   };
 
+  const generateInvite = async () => {
+    try {
+      setGeneratingInvite(true);
+      const response = await request<{ inviteUrl: string; expiresAt: string }>(
+        `/groups/${groupId}/invite-links`,
+        { method: 'POST' },
+      );
+      await Share.share({ message: response.inviteUrl });
+    } catch (error) {
+      Alert.alert('招待リンクの作成に失敗しました', toApiErrorMessage(error));
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
   const submitMood = async (mood: string) => {
     try {
       setSubmittingMood(true);
-      await apiRequest('/me/mood-stamp', {
+      await request('/me/mood-stamp', {
         method: 'POST',
-        token: currentSession.accessToken,
         body: { mood },
       });
       await loadGroup();
@@ -130,6 +189,56 @@ export default function GroupDetailScreen() {
       Alert.alert('気分スタンプの送信に失敗しました', toApiErrorMessage(error));
     } finally {
       setSubmittingMood(false);
+    }
+  };
+
+  const submitReaction = async (
+    moodStampId: string,
+    reactionType: ReactionType,
+    currentReaction: ReactionType | null,
+  ) => {
+    try {
+      setSubmittingReactionFor(moodStampId);
+      if (currentReaction === reactionType) {
+        await request(`/mood-stamps/${moodStampId}/reactions`, {
+          method: 'DELETE',
+        });
+      } else {
+        await request(`/mood-stamps/${moodStampId}/reactions`, {
+          method: 'PUT',
+          body: { reactionType },
+        });
+      }
+      setReactionPickerFor(null);
+      await loadGroup();
+    } catch (error) {
+      Alert.alert('リアクションの送信に失敗しました', toApiErrorMessage(error));
+    } finally {
+      setSubmittingReactionFor(null);
+    }
+  };
+
+  const submitPromptAnswer = async (choiceKey: string) => {
+    try {
+      setSubmittingPromptChoice(choiceKey);
+      const response = await request<{
+        promptKey: string;
+        businessDateJst: string;
+        choiceKey: string;
+      }>(`/groups/${groupId}/daily-prompt/answer`, {
+        method: 'PUT',
+        body: { choiceKey },
+      });
+      setDailyPrompt((prev) =>
+        prev && prev.promptKey === response.promptKey
+          ? { ...prev, myAnswer: response.choiceKey }
+          : prev,
+      );
+      await loadGroup();
+    } catch (error) {
+      Alert.alert('お題の回答に失敗しました', toApiErrorMessage(error));
+    } finally {
+      setSubmittingPromptChoice(null);
     }
   };
 
@@ -157,6 +266,17 @@ export default function GroupDetailScreen() {
                 {selfMember?.state === 'checked_in' ? '今日反応済み' : '今日いる'}
               </Text>
             </Pressable>
+            <Pressable
+              style={[styles.inviteButton, generatingInvite && styles.buttonDisabled]}
+              disabled={generatingInvite}
+              onPress={() => { void generateInvite(); }}
+            >
+              {generatingInvite ? (
+                <ActivityIndicator color={colors.accentStrong} size="small" />
+              ) : (
+                <Text style={styles.inviteButtonLabel}>メンバーを招待</Text>
+              )}
+            </Pressable>
           </View>
 
           {selfMember?.state === 'checked_in' && !selfMember.mood ? (
@@ -179,61 +299,257 @@ export default function GroupDetailScreen() {
             </View>
           ) : null}
 
+          {dailyPrompt ? (
+            <DailyPromptCard
+              prompt={dailyPrompt}
+              submittingChoiceKey={submittingPromptChoice}
+              onChoose={(choiceKey) => {
+                void submitPromptAnswer(choiceKey);
+              }}
+            />
+          ) : null}
+
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>メンバー一覧</Text>
-            {sortedMembers.map((member, index) => (
-              <Pressable
-                key={`${member.displayName}-${index}`}
-                style={[
-                  styles.memberCard,
-                  !member.isInteractive && styles.memberCardDisabled,
-                ]}
-                disabled={!member.isInteractive}
-                onPress={() => {
-                  Alert.alert(
-                    member.displayName,
-                    [
-                      member.userId ? `@${member.userId}` : null,
-                      member.state ? `状態: ${toAliveStateLabel(member.state)}` : null,
-                      member.lastCheckedInAt
-                        ? `最終反応: ${formatDateTime(member.lastCheckedInAt)}`
-                        : null,
-                      member.mood ? `気分: ${member.mood}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join('\n'),
-                  );
-                }}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>
-                    {member.displayName.slice(0, 1)}
-                  </Text>
+            {sortedMembers.map((member, index) => {
+              const isSelf = member.userId === selfUserId;
+              const canReact =
+                !isSelf &&
+                member.isInteractive &&
+                !!member.moodStampId &&
+                !!member.mood;
+              const moodStampId = member.moodStampId ?? null;
+              const pickerOpen =
+                moodStampId !== null && reactionPickerFor === moodStampId;
+              const reactionBusy =
+                moodStampId !== null && submittingReactionFor === moodStampId;
+
+              return (
+                <View
+                  key={`${member.displayName}-${index}`}
+                  style={[
+                    styles.memberCard,
+                    !member.isInteractive && styles.memberCardDisabled,
+                  ]}
+                >
+                  <Pressable
+                    style={styles.memberRow}
+                    disabled={!member.isInteractive}
+                    onPress={() => {
+                      Alert.alert(
+                        member.displayName,
+                        [
+                          member.userId ? `@${member.userId}` : null,
+                          member.state
+                            ? `状態: ${toAliveStateLabel(member.state)}`
+                            : null,
+                          member.lastCheckedInAt
+                            ? `最終反応: ${formatDateTime(member.lastCheckedInAt)}`
+                            : null,
+                          member.mood ? `気分: ${member.mood}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join('\n'),
+                      );
+                    }}
+                  >
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarLabel}>
+                        {member.displayName.slice(0, 1)}
+                      </Text>
+                    </View>
+                    <View style={styles.memberBody}>
+                      <Text style={styles.memberName}>{member.displayName}</Text>
+                      {member.isInteractive ? (
+                        <>
+                          <Text style={styles.memberMeta}>
+                            {toAliveStateLabel(member.state)}
+                          </Text>
+                          <Text style={styles.memberMeta}>
+                            最終反応: {formatDateTime(member.lastCheckedInAt ?? null)}
+                          </Text>
+                          <Text style={styles.memberMeta}>
+                            気分: {member.mood ?? '未設定'}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.memberMeta}>参加中</Text>
+                      )}
+                    </View>
+                  </Pressable>
+
+                  {member.isInteractive &&
+                  member.moodReactions &&
+                  (canReact || member.moodReactions.total > 0 || isSelf) ? (
+                    <ReactionBar
+                      reactions={member.moodReactions}
+                      canReact={canReact}
+                      pickerOpen={pickerOpen}
+                      submitting={reactionBusy}
+                      onTogglePicker={() => {
+                        if (!moodStampId) return;
+                        setReactionPickerFor((prev) =>
+                          prev === moodStampId ? null : moodStampId,
+                        );
+                      }}
+                      onSelect={(reactionType) => {
+                        if (!moodStampId) return;
+                        void submitReaction(
+                          moodStampId,
+                          reactionType,
+                          member.moodReactions?.myReaction ?? null,
+                        );
+                      }}
+                    />
+                  ) : null}
                 </View>
-                <View style={styles.memberBody}>
-                  <Text style={styles.memberName}>{member.displayName}</Text>
-                  {member.isInteractive ? (
-                    <>
-                      <Text style={styles.memberMeta}>
-                        {toAliveStateLabel(member.state)}
-                      </Text>
-                      <Text style={styles.memberMeta}>
-                        最終反応: {formatDateTime(member.lastCheckedInAt ?? null)}
-                      </Text>
-                      <Text style={styles.memberMeta}>
-                        気分: {member.mood ?? '未設定'}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.memberMeta}>参加中</Text>
-                  )}
-                </View>
-              </Pressable>
-            ))}
+              );
+            })}
           </View>
         </>
       )}
     </ScrollView>
+  );
+}
+
+interface DailyPromptCardProps {
+  prompt: DailyPromptResponse;
+  submittingChoiceKey: string | null;
+  onChoose: (choiceKey: string) => void;
+}
+
+function DailyPromptCard({
+  prompt,
+  submittingChoiceKey,
+  onChoose,
+}: DailyPromptCardProps) {
+  const definition = getPromptDefinition(prompt.promptKey);
+  if (!definition) {
+    return null;
+  }
+
+  const answersByChoice = new Map<string, DailyPromptAnswerView[]>();
+  for (const answer of prompt.answers) {
+    const bucket = answersByChoice.get(answer.choiceKey) ?? [];
+    bucket.push(answer);
+    answersByChoice.set(answer.choiceKey, bucket);
+  }
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.promptEyebrow}>今日のお題</Text>
+      <Text style={styles.promptQuestion}>{definition.question}</Text>
+      <View style={styles.promptChoices}>
+        {definition.choices.map((choice) => {
+          const selected = prompt.myAnswer === choice.key;
+          const submitting = submittingChoiceKey === choice.key;
+          const voters = answersByChoice.get(choice.key) ?? [];
+          return (
+            <Pressable
+              key={choice.key}
+              style={[
+                styles.promptChoice,
+                selected && styles.promptChoiceSelected,
+                submitting && styles.buttonDisabled,
+              ]}
+              disabled={submittingChoiceKey !== null}
+              onPress={() => onChoose(choice.key)}
+            >
+              <Text
+                style={[
+                  styles.promptChoiceLabel,
+                  selected && styles.promptChoiceLabelSelected,
+                ]}
+              >
+                {choice.label}
+              </Text>
+              {voters.length > 0 ? (
+                <Text style={styles.promptVoters}>
+                  {voters.map((v) => v.displayName).join(', ')}
+                </Text>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+interface ReactionBarProps {
+  reactions: MoodReactionsView;
+  canReact: boolean;
+  pickerOpen: boolean;
+  submitting: boolean;
+  onTogglePicker: () => void;
+  onSelect: (reactionType: ReactionType) => void;
+}
+
+function ReactionBar({
+  reactions,
+  canReact,
+  pickerOpen,
+  submitting,
+  onTogglePicker,
+  onSelect,
+}: ReactionBarProps) {
+  const counts = REACTIONS.filter(
+    (r) => (reactions.byType[r.type] ?? 0) > 0,
+  );
+
+  return (
+    <View style={styles.reactionBar}>
+      <View style={styles.reactionCounts}>
+        {counts.length === 0 ? (
+          <Text style={styles.reactionCountsEmpty}>まだ反応なし</Text>
+        ) : (
+          counts.map((r) => (
+            <Text key={r.type} style={styles.reactionCountItem}>
+              {r.emoji} {reactions.byType[r.type]}
+            </Text>
+          ))
+        )}
+      </View>
+      {canReact ? (
+        <Pressable
+          style={[
+            styles.reactionToggle,
+            reactions.myReaction && styles.reactionToggleActive,
+          ]}
+          disabled={submitting}
+          onPress={onTogglePicker}
+        >
+          <Text style={styles.reactionToggleLabel}>
+            {reactions.myReaction
+              ? REACTION_BY_TYPE[reactions.myReaction].emoji
+              : '+ 反応'}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {canReact && pickerOpen ? (
+        <View style={styles.reactionPicker}>
+          {REACTIONS.map((r) => {
+            const active = reactions.myReaction === r.type;
+            return (
+              <Pressable
+                key={r.type}
+                style={[
+                  styles.reactionPickerItem,
+                  active && styles.reactionPickerItemActive,
+                  submitting && styles.buttonDisabled,
+                ]}
+                disabled={submitting}
+                onPress={() => onSelect(r.type)}
+              >
+                <Text style={styles.reactionPickerEmoji}>{r.emoji}</Text>
+                <Text style={styles.reactionPickerLabel}>{r.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -284,6 +600,20 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
+  inviteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,253,248,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,253,248,0.5)',
+  },
+  inviteButtonLabel: {
+    color: '#fffdf8',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -300,13 +630,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   memberCard: {
-    flexDirection: 'row',
     gap: 12,
     padding: 14,
     borderRadius: 16,
     backgroundColor: '#fcfaf4',
     borderWidth: 1,
     borderColor: '#e1dacd',
+  },
+  memberRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   memberCardDisabled: {
     backgroundColor: '#f7f3ea',
@@ -337,5 +670,107 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: colors.muted,
+  },
+  promptEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent,
+    letterSpacing: 1,
+  },
+  promptQuestion: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  promptChoices: {
+    gap: 8,
+  },
+  promptChoice: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: colors.nestedSurface,
+    borderWidth: 1,
+    borderColor: colors.nestedBorder,
+    gap: 4,
+  },
+  promptChoiceSelected: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  promptChoiceLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.ink,
+  },
+  promptChoiceLabelSelected: {
+    color: colors.accentStrong,
+  },
+  promptVoters: {
+    fontSize: 12,
+    color: colors.muted,
+  },
+  reactionBar: {
+    gap: 8,
+  },
+  reactionCounts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  reactionCountItem: {
+    fontSize: 13,
+    color: colors.ink,
+  },
+  reactionCountsEmpty: {
+    fontSize: 12,
+    color: colors.hint,
+  },
+  reactionToggle: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  reactionToggleActive: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  reactionToggleLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.accentStrong,
+  },
+  reactionPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingTop: 4,
+  },
+  reactionPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.nestedSurface,
+    borderWidth: 1,
+    borderColor: colors.nestedBorder,
+  },
+  reactionPickerItemActive: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  reactionPickerEmoji: {
+    fontSize: 16,
+  },
+  reactionPickerLabel: {
+    fontSize: 12,
+    color: colors.ink,
   },
 });

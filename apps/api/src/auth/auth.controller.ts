@@ -120,12 +120,11 @@ export class AuthController {
 
     await pipeline(file.file, createWriteStream(filePath));
 
-    const baseUrl = process.env.API_BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
-    const avatarUrl = `${baseUrl}/uploads/avatars/${filename}`;
+    const avatarPath = `/uploads/avatars/${filename}`;
 
-    await this.profileService.updateAvatarUrl(req.user, avatarUrl);
+    await this.profileService.updateAvatarUrl(req.user, avatarPath);
 
-    return { avatarUrl };
+    return { avatarUrl: avatarPath };
   }
 
   @Patch('profile')

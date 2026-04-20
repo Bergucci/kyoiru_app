@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import {
   GroupNotificationLevel,
   GroupType,
+  MoodStampReactionType,
   ProfileStatus,
   Prisma,
 } from '@prisma/client';
@@ -29,6 +30,12 @@ export interface GroupSummary {
   memberCount: number;
 }
 
+export interface GroupMemberMoodReactions {
+  total: number;
+  byType: Partial<Record<MoodStampReactionType, number>>;
+  myReaction: MoodStampReactionType | null;
+}
+
 export interface GroupMemberSummary {
   displayName: string;
   avatarUrl: string | null;
@@ -36,6 +43,10 @@ export interface GroupMemberSummary {
   state?: 'checked_in' | 'pending' | 'overdue' | 'monitor_alert';
   lastCheckedInAt?: Date | null;
   mood?: string | null;
+  /// その日の気分スタンプ ID (未設定または block 済みメンバーは未返却)
+  moodStampId?: string | null;
+  /// 気分スタンプへの今日のリアクション集計 (気分未設定時は null)
+  moodReactions?: GroupMemberMoodReactions | null;
   isInteractive: boolean;
 }
 
@@ -187,7 +198,14 @@ export class GroupsService {
                     deletedAt: null,
                   },
                   select: {
+                    id: true,
                     mood: true,
+                    reactions: {
+                      select: {
+                        fromUserId: true,
+                        reactionType: true,
+                      },
+                    },
                   },
                   take: 1,
                 },
@@ -223,16 +241,43 @@ export class GroupsService {
         }
 
         const lastCheckedInAt = member.user.dailyCheckins[0]?.checkedInAt ?? null;
+        const moodStamp = member.user.dailyMoodStamps[0] ?? null;
         return {
           userId: member.user.userId,
           displayName: member.user.displayName,
           avatarUrl: member.user.avatarUrl,
           state: getCurrentAliveState(now, lastCheckedInAt),
           lastCheckedInAt,
-          mood: member.user.dailyMoodStamps[0]?.mood ?? null,
+          mood: moodStamp?.mood ?? null,
+          moodStampId: moodStamp?.id ?? null,
+          moodReactions: moodStamp
+            ? this.aggregateMoodReactions(moodStamp.reactions, currentUser.id)
+            : null,
           isInteractive: true,
         };
       }),
+    };
+  }
+
+  private aggregateMoodReactions(
+    reactions: ReadonlyArray<{
+      fromUserId: string;
+      reactionType: MoodStampReactionType;
+    }>,
+    currentUserId: string,
+  ): GroupMemberMoodReactions {
+    const byType: Partial<Record<MoodStampReactionType, number>> = {};
+    let myReaction: MoodStampReactionType | null = null;
+    for (const reaction of reactions) {
+      byType[reaction.reactionType] = (byType[reaction.reactionType] ?? 0) + 1;
+      if (reaction.fromUserId === currentUserId) {
+        myReaction = reaction.reactionType;
+      }
+    }
+    return {
+      total: reactions.length,
+      byType,
+      myReaction,
     };
   }
 

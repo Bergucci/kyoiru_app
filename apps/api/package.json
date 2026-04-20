@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "nest start --watch",
+    "dev": "fuser -k 3000/tcp 2>/dev/null; nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
@@ -15,8 +15,8 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@fastify/multipart": "^10.0.0",
-    "@fastify/static": "^9.1.1",
+    "@fastify/multipart": "^8.3.1",
+    "@fastify/static": "^7.0.4",
     "@kyoiru/contracts": "workspace:*",
     "@kyoiru/domain": "workspace:*",
     "@nestjs/common": "^10.4.15",
@@ -33,6 +33,7 @@
     "fastify": "^4.29.0",
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^4.0.1",
+    "nodemailer": "^8.0.5",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
@@ -44,6 +45,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.13.5",
+    "@types/nodemailer": "^8.0.0",
     "@types/passport-jwt": "^4.0.1",
     "prisma": "^6.7.0",
     "typescript": "^5.7.3"

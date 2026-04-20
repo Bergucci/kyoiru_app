@@ -44,3 +44,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Claude Code local state / worktrees
+.claude/
+
+# API runtime uploads
+apps/api/uploads/

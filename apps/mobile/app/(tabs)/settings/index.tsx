@@ -2,6 +2,7 @@ import { Redirect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '../../../src/session/session-context';
+import { resolveMediaUrl } from '../../../src/lib/api';
 import { colors } from '../../../src/ui/theme';
 
 const primaryMenuItems = [
@@ -58,18 +59,11 @@ export default function SettingsIndexScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>設定</Text>
-        <Text style={styles.heroText}>
-          プロフィール、アカウント、通知、サブスクを本体メニューに戻しました。
-        </Text>
-      </View>
-
       <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            {session.user.avatarUrl ? (
-              <Image source={{ uri: session.user.avatarUrl }} style={styles.avatarImage} />
+            {resolveMediaUrl(session.user.avatarUrl) ? (
+              <Image source={{ uri: resolveMediaUrl(session.user.avatarUrl) }} style={styles.avatarImage} />
             ) : (
               <Text style={styles.avatarLabel}>{profileInitial}</Text>
             )}

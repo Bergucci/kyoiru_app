@@ -4,16 +4,17 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import { toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import { formatDateTime } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
 
 interface AccountSettingsResponse {
   userId: string;
@@ -46,14 +47,13 @@ export default function UserIdSettingsScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
+  const { request } = useApi();
   const currentSession = session;
 
   async function loadAccountSettings() {
     try {
       setLoading(true);
-      const response = await apiRequest<AccountSettingsResponse>('/auth/account-settings', {
-        token: currentSession.accessToken,
-      });
+      const response = await request<AccountSettingsResponse>('/auth/account-settings', {});
       setSettings(response);
       setUserId(response.userId);
     } catch (error) {
@@ -71,9 +71,8 @@ export default function UserIdSettingsScreen() {
 
     try {
       setSaving(true);
-      const response = await apiRequest<AccountSettingsResponse>('/auth/account-settings', {
+      const response = await request<AccountSettingsResponse>('/auth/account-settings', {
         method: 'PATCH',
-        token: currentSession.accessToken,
         body: {
           userId: userId.trim(),
         },
@@ -92,7 +91,7 @@ export default function UserIdSettingsScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>ID変更</Text>
         <Text style={styles.body}>
@@ -127,7 +126,7 @@ export default function UserIdSettingsScreen() {
           </Pressable>
         </View>
       )}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

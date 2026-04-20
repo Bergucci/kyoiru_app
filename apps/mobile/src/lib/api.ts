@@ -10,7 +10,7 @@ export class ApiError extends Error {
   }
 }
 
-interface ApiRequestOptions {
+export interface ApiRequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   token?: string | null;
   body?: unknown;
@@ -48,6 +48,12 @@ export async function apiRequest<T>(
 
 export function getApiUrl(): string {
   return API_URL;
+}
+
+export function resolveMediaUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return `${API_URL}${path}`;
 }
 
 export function toApiErrorMessage(error: unknown): string {

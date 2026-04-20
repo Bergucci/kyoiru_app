@@ -4,20 +4,22 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { toApiErrorMessage } from '../../../src/lib/api';
 import {
   formatDateTime,
   toAliveStateLabel,
   toGroupTypeLabel,
 } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
+import { useApi } from '../../../src/lib/use-api';
 import { colors } from '../../../src/ui/theme';
+import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
 
 interface GroupSummary {
   groupId: string;
@@ -27,21 +29,13 @@ interface GroupSummary {
   memberCount: number;
 }
 
-interface FriendSummary {
-  friendshipId: string;
-  friend: {
-    userId: string;
-    displayName: string;
-    avatarUrl: string | null;
-  };
-}
-
 interface CheckinHistoryResponse {
   days: Array<{
     businessDateJst: string;
     checkedIn: boolean;
     checkedInAt: string | null;
     mood: string | null;
+    note: string | null;
     state: string;
   }>;
 }
@@ -62,11 +56,7 @@ export default function HomeTabScreen() {
   const [loading, setLoading] = useState(true);
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
   const [submittingMood, setSubmittingMood] = useState(false);
-  const [friends, setFriends] = useState<FriendSummary[]>([]);
-  const [creatingGroup, setCreatingGroup] = useState(false);
-  const [groupName, setGroupName] = useState('');
-  const [groupType, setGroupType] = useState<'friends' | 'family'>('friends');
-  const [selectedFriendUserIds, setSelectedFriendUserIds] = useState<Set<string>>(new Set());
+  const [noteInput, setNoteInput] = useState('');
 
   useEffect(() => {
     if (session?.accessToken) {
@@ -82,27 +72,18 @@ export default function HomeTabScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
-  const currentSession = session;
-
+  const { request } = useApi();
   const today = history?.days[0] ?? null;
 
   async function loadHomeData() {
     try {
       setLoading(true);
-      const [groupsResponse, historyResponse, friendsResponse] = await Promise.all([
-        apiRequest<GroupSummary[]>('/groups', {
-          token: currentSession.accessToken,
-        }),
-        apiRequest<CheckinHistoryResponse>('/me/checkins/history', {
-          token: currentSession.accessToken,
-        }),
-        apiRequest<FriendSummary[]>('/friends', {
-          token: currentSession.accessToken,
-        }),
+      const [groupsResponse, historyResponse] = await Promise.all([
+        request<GroupSummary[]>('/groups', {}),
+        request<CheckinHistoryResponse>('/me/checkins/history', {}),
       ]);
       setGroups(groupsResponse);
       setHistory(historyResponse);
-      setFriends(friendsResponse);
     } catch (error) {
       Alert.alert('ホームの取得に失敗しました', toApiErrorMessage(error));
     } finally {
@@ -113,9 +94,8 @@ export default function HomeTabScreen() {
   const submitCheckin = async () => {
     try {
       setSubmittingCheckin(true);
-      await apiRequest('/me/checkins/today', {
+      await request('/me/checkins/today', {
         method: 'POST',
-        token: currentSession.accessToken,
       });
       await loadHomeData();
     } catch (error) {
@@ -128,11 +108,11 @@ export default function HomeTabScreen() {
   const submitMood = async (mood: string) => {
     try {
       setSubmittingMood(true);
-      await apiRequest('/me/mood-stamp', {
+      await request('/me/mood-stamp', {
         method: 'POST',
-        token: currentSession.accessToken,
-        body: { mood },
+        body: { mood, note: noteInput.trim() || undefined },
       });
+      setNoteInput('');
       await loadHomeData();
     } catch (error) {
       Alert.alert('気分スタンプの送信に失敗しました', toApiErrorMessage(error));
@@ -141,67 +121,10 @@ export default function HomeTabScreen() {
     }
   };
 
-  const toggleFriend = (userId: string) => {
-    setSelectedFriendUserIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-      } else {
-        next.add(userId);
-      }
-      return next;
-    });
-  };
-
-  const createGroup = async () => {
-    if (!groupName.trim()) {
-      Alert.alert('入力不足', 'グループ名を入力してください。');
-      return;
-    }
-
-    try {
-      setCreatingGroup(true);
-      const response = await apiRequest<GroupSummary>('/groups', {
-        method: 'POST',
-        token: currentSession.accessToken,
-        body: {
-          name: groupName.trim(),
-          type: groupType,
-          initialMemberUserIds: Array.from(selectedFriendUserIds),
-        },
-      });
-      setGroupName('');
-      setSelectedFriendUserIds(new Set());
-      await loadHomeData();
-      router.push(
-        {
-          pathname: '/(tabs)/home/groups/[groupId]',
-          params: { groupId: response.groupId },
-        } as never,
-      );
-    } catch (error) {
-      Alert.alert('グループ作成に失敗しました', toApiErrorMessage(error));
-    } finally {
-      setCreatingGroup(false);
-    }
-  };
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>ホーム</Text>
-        <Text style={styles.heroText}>
-          自分の今日の状態と所属グループを確認し、必要ならすぐに「今日いる」を送れます。
-        </Text>
-      </View>
-
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
       <View style={styles.card}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>今日の状態</Text>
-          <Pressable onPress={() => void loadHomeData()}>
-            <Text style={styles.refreshText}>再読込</Text>
-          </Pressable>
-        </View>
+        <Text style={styles.sectionTitle}>今日の状態</Text>
         {loading ? (
           <ActivityIndicator color={colors.accent} />
         ) : (
@@ -213,15 +136,16 @@ export default function HomeTabScreen() {
               最終反応: {formatDateTime(today?.checkedInAt ?? null)}
             </Text>
             <Text style={styles.metaText}>気分: {today?.mood ?? '未設定'}</Text>
+            {today?.note ? (
+              <Text style={styles.noteText}>「{today.note}」</Text>
+            ) : null}
             <Pressable
               style={[
                 styles.primaryButton,
                 (today?.checkedIn || submittingCheckin) && styles.buttonDisabled,
               ]}
               disabled={today?.checkedIn || submittingCheckin}
-              onPress={() => {
-                void submitCheckin();
-              }}
+              onPress={() => { void submitCheckin(); }}
             >
               <Text style={styles.primaryButtonLabel}>
                 {today?.checkedIn ? '今日反応済み' : '今日いる'}
@@ -235,20 +159,23 @@ export default function HomeTabScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>気分スタンプ</Text>
           <Text style={styles.metaText}>
-            生存報告後に、その日の気分を 1 つだけ送れます。
+            今日の気分と一言を送れます。
           </Text>
+          <TextInput
+            style={styles.noteInput}
+            value={noteInput}
+            onChangeText={setNoteInput}
+            placeholder="今日の一言（任意）"
+            placeholderTextColor={colors.hint}
+            maxLength={100}
+          />
           <View style={styles.chipWrap}>
             {moodOptions.map((mood) => (
               <Pressable
                 key={mood.value}
-                style={[
-                  styles.chip,
-                  submittingMood && styles.buttonDisabled,
-                ]}
+                style={[styles.chip, submittingMood && styles.buttonDisabled]}
                 disabled={submittingMood}
-                onPress={() => {
-                  void submitMood(mood.value);
-                }}
+                onPress={() => { void submitMood(mood.value); }}
               >
                 <Text style={styles.chipLabel}>{mood.label}</Text>
               </Pressable>
@@ -258,64 +185,19 @@ export default function HomeTabScreen() {
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>グループ作成</Text>
-        <TextInput
-          value={groupName}
-          onChangeText={setGroupName}
-          placeholder="グループ名"
-          style={styles.input}
-        />
-        <View style={styles.segment}>
-          <Pressable
-            style={[styles.segmentButton, groupType === 'friends' && styles.segmentButtonActive]}
-            onPress={() => { setGroupType('friends'); }}
-          >
-            <Text style={[styles.segmentLabel, groupType === 'friends' && styles.segmentLabelActive]}>
-              友人・恋人
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segmentButton, groupType === 'family' && styles.segmentButtonActive]}
-            onPress={() => { setGroupType('family'); }}
-          >
-            <Text style={[styles.segmentLabel, groupType === 'family' && styles.segmentLabelActive]}>
-              家族
-            </Text>
-          </Pressable>
-        </View>
-        {friends.length > 0 ? (
-          <View style={styles.friendPickerList}>
-            <Text style={styles.metaText}>メンバーを選択（任意）</Text>
-            {friends.map((item) => {
-              const selected = selectedFriendUserIds.has(item.friend.userId);
-              return (
-                <Pressable
-                  key={item.friendshipId}
-                  style={[styles.friendPickerRow, selected && styles.friendPickerRowSelected]}
-                  onPress={() => { toggleFriend(item.friend.userId); }}
-                >
-                  <Text style={[styles.friendPickerName, selected && styles.friendPickerNameSelected]}>
-                    {item.friend.displayName}
-                  </Text>
-                  <Text style={styles.friendPickerCheck}>{selected ? '✓' : ''}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : (
-          <Text style={styles.metaText}>友達を追加するとメンバーに招待できます。</Text>
-        )}
-        <Pressable
-          style={[styles.primaryButton, creatingGroup && styles.buttonDisabled]}
-          disabled={creatingGroup}
-          onPress={() => { void createGroup(); }}
-        >
-          <Text style={styles.primaryButtonLabel}>グループを作成する</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.card}>
         <Text style={styles.sectionTitle}>所属グループ</Text>
+
+        <Pressable
+          style={styles.createGroupRow}
+          onPress={() => { router.push('/(tabs)/home/create-group' as never); }}
+        >
+          <View style={styles.createGroupIcon}>
+            <Ionicons name="people" size={22} color={colors.accentStrong} />
+          </View>
+          <Text style={styles.createGroupLabel}>グループを作成</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.hint} />
+        </Pressable>
+
         {loading ? (
           <ActivityIndicator color={colors.accent} />
         ) : groups.length === 0 ? (
@@ -334,14 +216,12 @@ export default function HomeTabScreen() {
             >
               <Text style={styles.groupTitle}>{group.name}</Text>
               <Text style={styles.metaText}>{toGroupTypeLabel(group.type)}</Text>
-              <Text style={styles.metaText}>
-                メンバー数: {group.memberCount}
-              </Text>
+              <Text style={styles.metaText}>メンバー数: {group.memberCount}</Text>
             </Pressable>
           ))
         )}
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -375,19 +255,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.ink,
-  },
-  refreshText: {
-    color: colors.accent,
-    fontWeight: '600',
   },
   statusText: {
     fontSize: 16,
@@ -398,6 +269,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     color: colors.muted,
+  },
+  noteText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: colors.ink,
+    fontStyle: 'italic',
   },
   primaryButton: {
     alignItems: 'center',
@@ -412,6 +289,16 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  noteInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: colors.ink,
   },
   chipWrap: {
     flexDirection: 'row',
@@ -428,34 +315,27 @@ const styles = StyleSheet.create({
     color: colors.accentStrong,
     fontWeight: '600',
   },
-  input: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    backgroundColor: colors.white,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  segment: {
+  createGroupRow: {
     flexDirection: 'row',
-    borderRadius: 14,
-    backgroundColor: colors.surfaceAlt,
-    padding: 4,
-  },
-  segmentButton: {
-    flex: 1,
     alignItems: 'center',
-    borderRadius: 12,
+    gap: 12,
     paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.nestedBorder,
   },
-  segmentButtonActive: {
-    backgroundColor: colors.white,
+  createGroupIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  segmentLabel: {
-    color: colors.muted,
+  createGroupLabel: {
+    flex: 1,
+    fontSize: 16,
     fontWeight: '600',
-  },
-  segmentLabelActive: {
     color: colors.ink,
   },
   groupCard: {
@@ -470,38 +350,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.ink,
-  },
-  friendPickerList: {
-    gap: 6,
-  },
-  friendPickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.nestedBorder,
-    backgroundColor: colors.nestedSurface,
-  },
-  friendPickerRowSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTint,
-  },
-  friendPickerName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.ink,
-  },
-  friendPickerNameSelected: {
-    color: colors.accentStrong,
-  },
-  friendPickerCheck: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.accent,
-    width: 20,
-    textAlign: 'right',
   },
 });

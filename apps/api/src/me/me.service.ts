@@ -30,6 +30,7 @@ export interface CheckinHistoryDay {
   checkedIn: boolean;
   checkedInAt: Date | null;
   mood: string | null;
+  note: string | null;
   state: 'checked_in' | 'pending' | 'overdue' | 'monitor_alert';
 }
 
@@ -109,6 +110,7 @@ export class MeService {
           userId: currentUser.id,
           businessDateJst,
           mood: dto.mood,
+          note: dto.note ?? null,
         },
       });
 
@@ -172,6 +174,7 @@ export class MeService {
         select: {
           businessDateJst: true,
           mood: true,
+          note: true,
           deletedAt: true,
         },
       }),
@@ -194,6 +197,7 @@ export class MeService {
           checkedIn: checkin !== null,
           checkedInAt: checkin?.checkedInAt ?? null,
           mood: moodStamp && moodStamp.deletedAt === null ? moodStamp.mood : null,
+          note: moodStamp && moodStamp.deletedAt === null ? (moodStamp.note ?? null) : null,
           state:
             checkin !== null
               ? 'checked_in'

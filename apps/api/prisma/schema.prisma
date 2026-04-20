@@ -120,6 +120,20 @@ enum CheckinTemplate {
   morning_noon_evening
 }
 
+/// 気分スタンプへの1タップリアクション種別 (5 種固定)
+/// like  = 👍 いいね
+/// heart = ❤️ 気持ち
+/// care  = 🤗 気にかけてる
+/// cheer = 💪 おつかれ
+/// same  = 😊 わかる
+enum MoodStampReactionType {
+  like
+  heart
+  care
+  cheer
+  same
+}
+
 // ─────────────────────────────────────────────
 // users
 // ─────────────────────────────────────────────
@@ -159,6 +173,9 @@ model User {
   freeCheckinReminderDeliveries FreeCheckinReminderDelivery[]
   dailyCheckins     DailyCheckin[]
   dailyMoodStamps   DailyMoodStamp[]
+  moodStampReactionsSent     MoodStampReaction[] @relation("MoodStampReactionsSent")
+  moodStampReactionsReceived MoodStampReaction[] @relation("MoodStampReactionsReceived")
+  dailyPromptAnswers DailyPromptAnswer[]
   subscriptionEntitlements UserSubscriptionEntitlement[]
   revenueCatWebhookEvents RevenueCatWebhookEvent[]
   refreshTokens     RefreshToken[]
@@ -301,6 +318,7 @@ model Group {
   members   GroupMember[]
   inviteLinks GroupInviteLink[]
   freeCheckinReminderDeliveries FreeCheckinReminderDelivery[]
+  dailyPrompts DailyPrompt[]
 
   @@index([createdByUserId])
   @@map("groups")
@@ -407,10 +425,12 @@ model DailyMoodStamp {
   businessDateJst String @map("business_date_jst")
 
   mood String
+  note String? @map("note")
   deletedAt DateTime? @map("deleted_at")
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id])
+  reactions MoodStampReaction[]
 
   @@unique([userId, businessDateJst], name: "uq_daily_mood_stamps_user_business_date")
   @@index([businessDateJst])
@@ -728,4 +748,83 @@ model AccountDeletionRequest {
   @@index([purge180dAfter, purge180dCompletedAt])
   @@index([purge7yAfter, purge7yCompletedAt])
   @@map("account_deletion_requests")
+}
+
+// ─────────────────────────────────────────────
+// mood_stamp_reactions
+// ─────────────────────────────────────────────
+
+/// 気分スタンプに対する 1 タップリアクション。
+/// 1 ユーザー 1 気分スタンプにつき 1 つ (差し替え型・履歴化しない)。
+/// JST 6:00 の業務日切替で当日分以外は実質参照されない (別途 purge ジョブで日次削除可)。
+model MoodStampReaction {
+  id String @id @default(uuid()) @db.Uuid
+
+  moodStampId     String @map("mood_stamp_id") @db.Uuid
+  fromUserId      String @map("from_user_id") @db.Uuid
+  toUserId        String @map("to_user_id") @db.Uuid
+  businessDateJst String @map("business_date_jst")
+
+  reactionType MoodStampReactionType @map("reaction_type")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  moodStamp DailyMoodStamp @relation(fields: [moodStampId], references: [id])
+  fromUser  User           @relation("MoodStampReactionsSent", fields: [fromUserId], references: [id])
+  toUser    User           @relation("MoodStampReactionsReceived", fields: [toUserId], references: [id])
+
+  /// 1 ユーザーは 1 気分スタンプにつき 1 リアクション (upsert で差し替え)
+  @@unique([moodStampId, fromUserId], name: "uq_mood_stamp_reactions_stamp_from")
+  @@index([businessDateJst])
+  @@index([toUserId, businessDateJst])
+  @@map("mood_stamp_reactions")
+}
+
+// ─────────────────────────────────────────────
+// daily_prompts
+// ─────────────────────────────────────────────
+
+/// グループごと 1 日 1 問のお題スナップショット。
+/// prompt_key は prompt-pool.ts の定数キー。表示文はアプリコード側で解決。
+/// 初回 GET 時に遅延発行する (cron 不要)。
+model DailyPrompt {
+  id String @id @default(uuid()) @db.Uuid
+
+  groupId         String @map("group_id") @db.Uuid
+  businessDateJst String @map("business_date_jst")
+  promptKey       String @map("prompt_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group   Group               @relation(fields: [groupId], references: [id])
+  answers DailyPromptAnswer[]
+
+  @@unique([groupId, businessDateJst], name: "uq_daily_prompts_group_business_date")
+  @@index([businessDateJst])
+  @@map("daily_prompts")
+}
+
+// ─────────────────────────────────────────────
+// daily_prompt_answers
+// ─────────────────────────────────────────────
+
+/// お題に対するメンバーの回答。1 人 1 プロンプトに 1 回答 (差し替えは上書き)。
+/// choice_key は prompt-pool.ts の選択肢キー。
+model DailyPromptAnswer {
+  id String @id @default(uuid()) @db.Uuid
+
+  promptId  String @map("prompt_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  choiceKey String @map("choice_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  prompt DailyPrompt @relation(fields: [promptId], references: [id])
+  user   User        @relation(fields: [userId], references: [id])
+
+  @@unique([promptId, userId], name: "uq_daily_prompt_answers_prompt_user")
+  @@index([userId])
+  @@map("daily_prompt_answers")
 }

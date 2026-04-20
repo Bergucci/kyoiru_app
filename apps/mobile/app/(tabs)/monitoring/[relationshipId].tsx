@@ -4,13 +4,13 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import { toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import {
   formatDateTime,
   toCheckinTemplateLabel,
@@ -21,6 +21,7 @@ import {
 } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
 
 interface MonitoringRelationshipSummary {
   id: string;
@@ -135,38 +136,28 @@ export default function MonitoringDetailScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
-  const currentSession = session;
+  const { request } = useApi();
 
   async function loadDetail() {
     try {
       setLoading(true);
-      const relationshipResponse = await apiRequest<MonitoringRelationshipSummary>(
+      const relationshipResponse = await request<MonitoringRelationshipSummary>(
         `/monitoring/${relationshipId}`,
-        {
-          token: currentSession.accessToken,
-        },
+        {},
       );
 
       const [settingsResponse, checkinResponse, dashboardResponse, emergencyResponse] =
         await Promise.all([
-          apiRequest<MonitoringSettingsResponse>(`/monitoring/${relationshipId}/settings`, {
-            token: currentSession.accessToken,
-          }),
-          apiRequest<CheckinSettingsResponse>(
+          request<MonitoringSettingsResponse>(`/monitoring/${relationshipId}/settings`, {}),
+          request<CheckinSettingsResponse>(
             `/monitoring/${relationshipId}/checkin-settings`,
-            {
-              token: currentSession.accessToken,
-            },
+            {},
           ),
-          apiRequest<DashboardItem[]>('/monitoring/dashboard', {
-            token: currentSession.accessToken,
-          }),
+          request<DashboardItem[]>('/monitoring/dashboard', {}),
           relationshipResponse.role === 'target'
-            ? apiRequest<EmergencyContactResponse>(
+            ? request<EmergencyContactResponse>(
                 `/monitoring/${relationshipId}/emergency-contact`,
-                {
-                  token: currentSession.accessToken,
-                },
+                {},
               )
             : Promise.resolve(null),
         ]);
@@ -193,11 +184,10 @@ export default function MonitoringDetailScreen() {
   const saveGpsShareMode = async () => {
     try {
       setSavingGps(true);
-      const response = await apiRequest<MonitoringSettingsResponse>(
+      const response = await request<MonitoringSettingsResponse>(
         `/monitoring/${relationshipId}/settings`,
         {
           method: 'PATCH',
-          token: currentSession.accessToken,
           body: { gpsShareMode },
         },
       );
@@ -212,11 +202,10 @@ export default function MonitoringDetailScreen() {
   const saveCheckinSettings = async () => {
     try {
       setSavingCheckin(true);
-      const response = await apiRequest<CheckinSettingsResponse>(
+      const response = await request<CheckinSettingsResponse>(
         `/monitoring/${relationshipId}/checkin-settings`,
         {
           method: 'PATCH',
-          token: currentSession.accessToken,
           body: {
             checkinFrequency,
             checkinTemplate: templateForFrequency(checkinFrequency),
@@ -239,11 +228,10 @@ export default function MonitoringDetailScreen() {
 
     try {
       setSavingContact(true);
-      const response = await apiRequest<EmergencyContactResponse>(
+      const response = await request<EmergencyContactResponse>(
         `/monitoring/${relationshipId}/emergency-contact`,
         {
           method: 'PUT',
-          token: currentSession.accessToken,
           body: {
             name: contactName.trim(),
             phoneNumber: contactPhoneNumber.trim(),
@@ -262,9 +250,8 @@ export default function MonitoringDetailScreen() {
   const revokeConsent = async () => {
     try {
       setRevoking(true);
-      await apiRequest(`/monitoring/${relationshipId}/revoke`, {
+      await request(`/monitoring/${relationshipId}/revoke`, {
         method: 'POST',
-        token: currentSession.accessToken,
       });
       await loadDetail();
     } catch (error) {
@@ -276,11 +263,9 @@ export default function MonitoringDetailScreen() {
 
   const openFinalStageEmergencyContact = async () => {
     try {
-      const response = await apiRequest<FinalStageEmergencyContact>(
+      const response = await request<FinalStageEmergencyContact>(
         `/monitoring/${relationshipId}/emergency-contact/final-stage`,
-        {
-          token: currentSession.accessToken,
-        },
+        {},
       );
       setFinalStageContact(response);
     } catch (error) {
@@ -292,7 +277,7 @@ export default function MonitoringDetailScreen() {
     relationship?.role === 'target' && relationship.status === 'active';
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
       {loading || !relationship || !settings || !checkinSettings ? (
         <ActivityIndicator color={colors.accent} />
       ) : (
@@ -527,7 +512,7 @@ export default function MonitoringDetailScreen() {
           </Pressable>
         </>
       )}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

@@ -132,7 +132,7 @@ export class FriendsService {
   ): Promise<UserSearchResult[]> {
     return this.prisma.user.findMany({
       where: {
-        userId: { startsWith: dto.userId },
+        userId: { equals: dto.userId },
         id: { not: currentUser.id },
         idSearchVisibility: IdSearchVisibility.public,
         profileStatus: ProfileStatus.active,

@@ -9,7 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import { toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 
@@ -27,6 +28,7 @@ export default function BlocksScreen() {
   const { session } = useSession();
   const [blocks, setBlocks] = useState<BlockListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (session?.accessToken) {
@@ -42,17 +44,16 @@ export default function BlocksScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
-  const currentSession = session;
+  const { request } = useApi();
 
   async function loadBlocks() {
     try {
       setLoading(true);
-      const response = await apiRequest<BlockListItem[]>('/blocks', {
-        token: currentSession.accessToken,
-      });
+      setLoadError(null);
+      const response = await request<BlockListItem[]>('/blocks', {});
       setBlocks(response);
     } catch (error) {
-      Alert.alert('block 一覧の取得に失敗しました', toApiErrorMessage(error));
+      setLoadError(toApiErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -60,9 +61,8 @@ export default function BlocksScreen() {
 
   const unblock = async (blockId: string) => {
     try {
-      await apiRequest(`/blocks/${blockId}`, {
+      await request(`/blocks/${blockId}`, {
         method: 'DELETE',
-        token: currentSession.accessToken,
       });
       await loadBlocks();
     } catch (error) {
@@ -82,6 +82,8 @@ export default function BlocksScreen() {
       <View style={styles.card}>
         {loading ? (
           <ActivityIndicator color={colors.accent} />
+        ) : loadError ? (
+          <Text style={styles.body}>{loadError}</Text>
         ) : blocks.length === 0 ? (
           <Text style={styles.body}>現在 block している相手はいません。</Text>
         ) : (

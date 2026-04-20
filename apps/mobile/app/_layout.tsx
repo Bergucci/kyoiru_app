@@ -16,6 +16,10 @@ export default function RootLayout() {
           name="friend-invites/[token]"
           options={{ title: '友達追加' }}
         />
+        <Stack.Screen
+          name="group-invites/[token]"
+          options={{ title: 'グループ招待' }}
+        />
         <Stack.Screen name="help" options={{ headerShown: false }} />
         <Stack.Screen
           name="subscription-info"

@@ -4,13 +4,13 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import {
   formatDateTime,
   toEntitlementLabel,
@@ -20,6 +20,7 @@ import {
 } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
 
 interface EntitlementResponse {
   planName: string;
@@ -129,15 +130,13 @@ export default function MonitoringTabScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
-  const currentSession = session;
+  const { request } = useApi();
 
   async function loadMonitoring() {
     try {
       setLoading(true);
       const [entitlementResponse, copyResponse] = await Promise.all([
-        apiRequest<EntitlementResponse>('/billing/entitlement', {
-          token: currentSession.accessToken,
-        }),
+        request<EntitlementResponse>('/billing/entitlement', {}),
         apiRequest<SubscriptionCopy>('/billing/subscription-copy'),
       ]);
 
@@ -158,18 +157,10 @@ export default function MonitoringTabScreen() {
         incomingResponse,
         outgoingResponse,
       ] = await Promise.all([
-        apiRequest<DashboardItem[]>('/monitoring/dashboard', {
-          token: currentSession.accessToken,
-        }),
-        apiRequest<MonitoringRelationshipSummary[]>('/monitoring', {
-          token: currentSession.accessToken,
-        }),
-        apiRequest<MonitoringRelationshipSummary[]>('/monitoring/requests/incoming', {
-          token: currentSession.accessToken,
-        }),
-        apiRequest<MonitoringRelationshipSummary[]>('/monitoring/requests/outgoing', {
-          token: currentSession.accessToken,
-        }),
+        request<DashboardItem[]>('/monitoring/dashboard', {}),
+        request<MonitoringRelationshipSummary[]>('/monitoring', {}),
+        request<MonitoringRelationshipSummary[]>('/monitoring/requests/incoming', {}),
+        request<MonitoringRelationshipSummary[]>('/monitoring/requests/outgoing', {}),
       ]);
 
       setDashboard(dashboardResponse);
@@ -191,9 +182,8 @@ export default function MonitoringTabScreen() {
 
     try {
       setRequesting(true);
-      await apiRequest('/monitoring/requests', {
+      await request('/monitoring/requests', {
         method: 'POST',
-        token: currentSession.accessToken,
         body: {
           targetUserId: targetUserId.trim(),
         },
@@ -212,9 +202,8 @@ export default function MonitoringTabScreen() {
     path: 'approve' | 'reject' | 'cancel',
   ) => {
     try {
-      await apiRequest(`/monitoring/requests/${requestId}/${path}`, {
+      await request(`/monitoring/requests/${requestId}/${path}`, {
         method: 'POST',
-        token: currentSession.accessToken,
       });
       await loadMonitoring();
     } catch (error) {
@@ -224,11 +213,9 @@ export default function MonitoringTabScreen() {
 
   const openFinalStageContact = async (relationshipId: string) => {
     try {
-      const response = await apiRequest<FinalStageEmergencyContact>(
+      const response = await request<FinalStageEmergencyContact>(
         `/monitoring/${relationshipId}/emergency-contact/final-stage`,
-        {
-          token: currentSession.accessToken,
-        },
+        {},
       );
       setContactCache((current) => ({
         ...current,
@@ -251,7 +238,7 @@ export default function MonitoringTabScreen() {
 
   if (!isPaid) {
     return (
-      <ScrollView contentContainerStyle={styles.container}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.container}>
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>大切な人を、もう少しちゃんと見守る。</Text>
           <Text style={styles.heroText}>
@@ -292,7 +279,7 @@ export default function MonitoringTabScreen() {
             監視ではなく、反応がない時に気づきやすくするための機能です。
           </Text>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     );
   }
 
@@ -301,7 +288,7 @@ export default function MonitoringTabScreen() {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>見守り</Text>
         <Text style={styles.heroText}>
@@ -505,7 +492,7 @@ export default function MonitoringTabScreen() {
           <Text style={styles.primaryButtonLabel}>見守り開始を送る</Text>
         </Pressable>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

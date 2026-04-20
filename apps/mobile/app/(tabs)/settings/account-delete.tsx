@@ -9,7 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { ApiError, apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import { toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 
@@ -41,14 +42,14 @@ export default function AccountDeleteScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
+  const { request } = useApi();
   const currentSession = session;
 
   const executeDelete = async () => {
     try {
       setSubmitting(true);
-      await apiRequest('/account', {
+      await request('/account', {
         method: 'DELETE',
-        token: currentSession.accessToken,
       });
 
       Alert.alert(
@@ -65,12 +66,6 @@ export default function AccountDeleteScreen() {
         ],
       );
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        clearSession();
-        router.replace('/(auth)/login' as never);
-        return;
-      }
-
       Alert.alert('退会に失敗しました', toApiErrorMessage(error));
     } finally {
       setSubmitting(false);

@@ -1,23 +1,28 @@
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { getApiUrl, resolveMediaUrl, toApiErrorMessage } from '../../../src/lib/api';
+import { useApi } from '../../../src/lib/use-api';
 import { useSession, type SessionUser } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
 
 export default function ProfileSettingsScreen() {
+  const router = useRouter();
   const { session, updateSessionUser } = useSession();
   const [displayName, setDisplayName] = useState(session?.user.displayName ?? '');
-  const [avatarUrl, setAvatarUrl] = useState(session?.user.avatarUrl ?? '');
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   if (!session) {
@@ -28,7 +33,44 @@ export default function ProfileSettingsScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
+  const { request } = useApi();
   const currentSession = session;
+  const currentAvatarUrl = resolveMediaUrl(currentSession.user.avatarUrl);
+
+  const pickAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('権限が必要です', '写真ライブラリへのアクセスを許可してください。');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadAvatar = async (localUri: string): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: localUri,
+      type: 'image/jpeg',
+      name: 'avatar.jpg',
+    } as unknown as Blob);
+
+    const response = await fetch(`${getApiUrl()}/auth/profile/avatar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${currentSession.accessToken}` },
+      body: formData,
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { avatarUrl: string | null };
+    return data.avatarUrl;
+  };
 
   const saveProfile = async () => {
     if (!displayName.trim()) {
@@ -38,15 +80,27 @@ export default function ProfileSettingsScreen() {
 
     try {
       setSaving(true);
-      const response = await apiRequest<SessionUser>('/auth/profile', {
+
+      let newAvatarPath: string | null | undefined = undefined;
+      if (avatarUri) {
+        newAvatarPath = await uploadAvatar(avatarUri);
+        if (!newAvatarPath) {
+          Alert.alert('アイコンのアップロードに失敗しました', '表示名のみ保存します。');
+        }
+      }
+
+      const body: Record<string, unknown> = { displayName: displayName.trim() };
+      if (newAvatarPath !== undefined) {
+        body.avatarUrl = newAvatarPath;
+      }
+
+      const response = await request<SessionUser>('/auth/profile', {
         method: 'PATCH',
-        token: currentSession.accessToken,
-        body: {
-          displayName: displayName.trim(),
-          avatarUrl: avatarUrl.trim() || null,
-        },
+        body,
       });
       updateSessionUser(response);
+      setAvatarUri(null);
+      Alert.alert('保存しました');
     } catch (error) {
       Alert.alert('プロフィール更新に失敗しました', toApiErrorMessage(error));
     } finally {
@@ -54,45 +108,70 @@ export default function ProfileSettingsScreen() {
     }
   };
 
+  const displayAvatar = avatarUri ?? currentAvatarUrl;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>プロフィール設定</Text>
-        <Text style={styles.body}>
-          表示名とアイコン URL を更新できます。保存後は session 表示も即時反映します。
-        </Text>
       </View>
 
       <View style={styles.card}>
-        <TextInput
-          value={displayName}
-          onChangeText={setDisplayName}
-          placeholder="表示名"
-          style={styles.input}
-        />
-        <TextInput
-          value={avatarUrl}
-          onChangeText={setAvatarUrl}
-          placeholder="avatar URL (任意)"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-        />
+        <View style={styles.avatarSection}>
+          <Pressable style={styles.avatarWrapper} onPress={() => { void pickAvatar(); }}>
+            {displayAvatar ? (
+              <Image source={{ uri: displayAvatar }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitial}>
+                  {(currentSession.user.displayName?.charAt(0) ?? '?').toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.avatarBadge}>
+              <Ionicons name="camera" size={14} color="#ffffff" />
+            </View>
+          </Pressable>
+          <Text style={styles.avatarHint}>タップして変更</Text>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>表示名</Text>
+          <TextInput
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder="表示名"
+            placeholderTextColor={colors.hint}
+            style={styles.input}
+          />
+        </View>
+
         <Pressable
           style={[styles.primaryButton, saving && styles.buttonDisabled]}
           disabled={saving}
-          onPress={() => {
-            void saveProfile();
-          }}
+          onPress={() => { void saveProfile(); }}
         >
           {saving ? (
             <ActivityIndicator color="#fffdf8" />
           ) : (
-            <Text style={styles.primaryButtonLabel}>プロフィールを保存</Text>
+            <Text style={styles.primaryButtonLabel}>保存する</Text>
           )}
         </Pressable>
       </View>
-    </ScrollView>
+
+      <View style={styles.menuCard}>
+        <Pressable
+          style={styles.menuRow}
+          onPress={() => { router.push('/(tabs)/settings/user-id' as never); }}
+        >
+          <Text style={styles.menuLabel}>ユーザーID変更</Text>
+          <View style={styles.menuTrailing}>
+            <Text style={styles.menuMeta}>@{currentSession.user.userId}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.hint} />
+          </View>
+        </Pressable>
+      </View>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -100,7 +179,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     gap: 16,
-    backgroundColor: '#f6f1e7',
+    backgroundColor: colors.pageBg,
   },
   card: {
     padding: 18,
@@ -108,25 +187,72 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 12,
+    gap: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: colors.ink,
   },
-  body: {
-    fontSize: 14,
-    lineHeight: 21,
+  avatarSection: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  avatarPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.accentStrong,
+  },
+  avatarBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.accentStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  avatarHint: {
+    fontSize: 12,
     color: colors.muted,
+  },
+  field: {
+    gap: 6,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.ink,
   },
   input: {
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    fontSize: 15,
+    color: colors.ink,
   },
   primaryButton: {
     alignItems: 'center',
@@ -141,5 +267,32 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  menuCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  menuLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.ink,
+  },
+  menuTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  menuMeta: {
+    fontSize: 13,
+    color: colors.muted,
   },
 });

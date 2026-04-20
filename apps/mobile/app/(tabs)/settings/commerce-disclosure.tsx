@@ -2,16 +2,22 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../../src/ui/theme';
 
 const items: [string, string][] = [
-  ['販売事業者', '（事業者名をここに記載）'],
-  ['運営責任者', '（氏名をここに記載）'],
-  ['所在地', '〒000-0000 東京都（住所をここに記載）'],
-  ['電話番号', 'お問い合わせフォームよりご連絡ください'],
-  ['メールアドレス', '設定画面の「ヘルプ・お問い合わせ」よりご連絡ください'],
-  ['販売価格', '各プランのサブスクリプション料金（アプリ内に表示）'],
-  ['支払方法', 'Apple App Store / Google Play の決済システムによる支払い'],
-  ['支払時期', '各ストアの規定に従います'],
-  ['サービス提供時期', '決済確認後、即時'],
-  ['返品・キャンセル', 'デジタルコンテンツの性質上、原則として返金・キャンセルは承っておりません。各ストアの規定に従います。'],
+  ['販売事業者', '株式会社corecty'],
+  ['代表者名', '加藤優介'],
+  ['所在地', '〒154-0024 東京都世田谷区三軒茶屋2丁目11-14'],
+  ['電話番号', '080-2058-8901\n受付時間：平日10:00〜18:00 / 土日祝日・年末年始を除く'],
+  ['メールアドレス', 'kyoiru.app@gmail.com'],
+  ['販売URL', 'App Store / Google Play（各ストアの本サービスページ）'],
+  ['販売価格', '各サブスクリプションプランの料金はアプリ内の購入画面に税込み価格で表示します。\n（料金はApp Store / Google Play の表示価格に従います。）'],
+  ['販売価格以外の費用', '通信料・パケット代は利用者のご負担となります。'],
+  ['支払方法', 'Apple App Store の決済システム（iOS端末）\nGoogle Play の決済システム（Android端末）\n※クレジットカードその他各ストアが定める支払方法をご利用いただけます。'],
+  ['支払時期', '各ストアの規定に従います。\nサブスクリプションは初回購入時に課金され、以降は更新期間ごとに自動課金されます。'],
+  ['サービスの提供時期', '決済確認後、即時にご利用いただけます。'],
+  ['サブスクリプションの更新', '有料プランは自動更新サブスクリプションです。\n現在の更新期間終了の24時間前までにキャンセルしない限り、自動的に更新されます。'],
+  ['解約・キャンセル方法', '各ストアのサブスクリプション管理画面から解約手続きを行ってください。\n・iOS：「設定」→「Apple ID」→「サブスクリプション」\n・Android：「Google Play」→「定期購入」\nキャンセル後も当該課金期間の終了まで機能をご利用いただけます。'],
+  ['返品・返金', 'デジタルコンテンツ・サービスの性質上、原則として返金・キャンセルは承っておりません。\nただし、各ストアの返金ポリシーに従った返金請求はその限りではありません。\n詳細は各ストアのサポートページをご確認ください。'],
+  ['動作環境', 'iOS 16.0以上 / Android 10以上を推奨します。\n対応状況はApp Store / Google Playの本サービスページをご確認ください。'],
+  ['サービス提供期間', '当社がサービスを継続して提供する期間とします。\nサービスを終了する場合は事前にアプリ内または電子メール等でお知らせします。'],
 ];
 
 export default function CommerceDisclosureScreen() {
@@ -19,7 +25,7 @@ export default function CommerceDisclosureScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.card}>
         <Text style={styles.intro}>
-          特定商取引法第11条に基づき、以下の通り表示します。
+          特定商取引に関する法律第11条（通信販売についての広告）および第42条（役務提供契約）に基づき、以下の通り表示します。
         </Text>
       </View>
 
@@ -30,6 +36,16 @@ export default function CommerceDisclosureScreen() {
             <Text style={styles.value}>{value}</Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.label}>お問い合わせ先</Text>
+        <Text style={styles.value}>
+          本表記に関するご質問・ご不明点は下記までご連絡ください。{'\n'}
+          メール：kyoiru.app@gmail.com{'\n'}
+          電話：080-2058-8901{'\n'}
+          受付時間：平日10:00〜18:00（土日祝日・年末年始を除く）
+        </Text>
       </View>
     </ScrollView>
   );
@@ -56,7 +72,7 @@ const styles = StyleSheet.create({
   },
   row: {
     paddingVertical: 14,
-    gap: 4,
+    gap: 6,
   },
   rowBorder: {
     borderBottomWidth: 1,
