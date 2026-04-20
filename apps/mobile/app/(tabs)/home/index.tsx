@@ -27,6 +27,15 @@ interface GroupSummary {
   memberCount: number;
 }
 
+interface FriendSummary {
+  friendshipId: string;
+  friend: {
+    userId: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+}
+
 interface CheckinHistoryResponse {
   days: Array<{
     businessDateJst: string;
@@ -53,10 +62,11 @@ export default function HomeTabScreen() {
   const [loading, setLoading] = useState(true);
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
   const [submittingMood, setSubmittingMood] = useState(false);
+  const [friends, setFriends] = useState<FriendSummary[]>([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupType, setGroupType] = useState<'friends' | 'family'>('friends');
-  const [initialMemberUserIds, setInitialMemberUserIds] = useState('');
+  const [selectedFriendUserIds, setSelectedFriendUserIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (session?.accessToken) {
@@ -79,16 +89,20 @@ export default function HomeTabScreen() {
   async function loadHomeData() {
     try {
       setLoading(true);
-      const [groupsResponse, historyResponse] = await Promise.all([
+      const [groupsResponse, historyResponse, friendsResponse] = await Promise.all([
         apiRequest<GroupSummary[]>('/groups', {
           token: currentSession.accessToken,
         }),
         apiRequest<CheckinHistoryResponse>('/me/checkins/history', {
           token: currentSession.accessToken,
         }),
+        apiRequest<FriendSummary[]>('/friends', {
+          token: currentSession.accessToken,
+        }),
       ]);
       setGroups(groupsResponse);
       setHistory(historyResponse);
+      setFriends(friendsResponse);
     } catch (error) {
       Alert.alert('ホームの取得に失敗しました', toApiErrorMessage(error));
     } finally {
@@ -127,6 +141,18 @@ export default function HomeTabScreen() {
     }
   };
 
+  const toggleFriend = (userId: string) => {
+    setSelectedFriendUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
   const createGroup = async () => {
     if (!groupName.trim()) {
       Alert.alert('入力不足', 'グループ名を入力してください。');
@@ -141,14 +167,11 @@ export default function HomeTabScreen() {
         body: {
           name: groupName.trim(),
           type: groupType,
-          initialMemberUserIds: initialMemberUserIds
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean),
+          initialMemberUserIds: Array.from(selectedFriendUserIds),
         },
       });
       setGroupName('');
-      setInitialMemberUserIds('');
+      setSelectedFriendUserIds(new Set());
       await loadHomeData();
       router.push(
         {
@@ -244,56 +267,48 @@ export default function HomeTabScreen() {
         />
         <View style={styles.segment}>
           <Pressable
-            style={[
-              styles.segmentButton,
-              groupType === 'friends' && styles.segmentButtonActive,
-            ]}
-            onPress={() => {
-              setGroupType('friends');
-            }}
+            style={[styles.segmentButton, groupType === 'friends' && styles.segmentButtonActive]}
+            onPress={() => { setGroupType('friends'); }}
           >
-            <Text
-              style={[
-                styles.segmentLabel,
-                groupType === 'friends' && styles.segmentLabelActive,
-              ]}
-            >
+            <Text style={[styles.segmentLabel, groupType === 'friends' && styles.segmentLabelActive]}>
               友人・恋人
             </Text>
           </Pressable>
           <Pressable
-            style={[
-              styles.segmentButton,
-              groupType === 'family' && styles.segmentButtonActive,
-            ]}
-            onPress={() => {
-              setGroupType('family');
-            }}
+            style={[styles.segmentButton, groupType === 'family' && styles.segmentButtonActive]}
+            onPress={() => { setGroupType('family'); }}
           >
-            <Text
-              style={[
-                styles.segmentLabel,
-                groupType === 'family' && styles.segmentLabelActive,
-              ]}
-            >
+            <Text style={[styles.segmentLabel, groupType === 'family' && styles.segmentLabelActive]}>
               家族
             </Text>
           </Pressable>
         </View>
-        <TextInput
-          value={initialMemberUserIds}
-          onChangeText={setInitialMemberUserIds}
-          placeholder="初期メンバー userId をカンマ区切りで入力 (任意)"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-        />
+        {friends.length > 0 ? (
+          <View style={styles.friendPickerList}>
+            <Text style={styles.metaText}>メンバーを選択（任意）</Text>
+            {friends.map((item) => {
+              const selected = selectedFriendUserIds.has(item.friend.userId);
+              return (
+                <Pressable
+                  key={item.friendshipId}
+                  style={[styles.friendPickerRow, selected && styles.friendPickerRowSelected]}
+                  onPress={() => { toggleFriend(item.friend.userId); }}
+                >
+                  <Text style={[styles.friendPickerName, selected && styles.friendPickerNameSelected]}>
+                    {item.friend.displayName}
+                  </Text>
+                  <Text style={styles.friendPickerCheck}>{selected ? '✓' : ''}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
+          <Text style={styles.metaText}>友達を追加するとメンバーに招待できます。</Text>
+        )}
         <Pressable
           style={[styles.primaryButton, creatingGroup && styles.buttonDisabled]}
           disabled={creatingGroup}
-          onPress={() => {
-            void createGroup();
-          }}
+          onPress={() => { void createGroup(); }}
         >
           <Text style={styles.primaryButtonLabel}>グループを作成する</Text>
         </Pressable>
@@ -455,5 +470,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.ink,
+  },
+  friendPickerList: {
+    gap: 6,
+  },
+  friendPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.nestedBorder,
+    backgroundColor: colors.nestedSurface,
+  },
+  friendPickerRowSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentTint,
+  },
+  friendPickerName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.ink,
+  },
+  friendPickerNameSelected: {
+    color: colors.accentStrong,
+  },
+  friendPickerCheck: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.accent,
+    width: 20,
+    textAlign: 'right',
   },
 });
