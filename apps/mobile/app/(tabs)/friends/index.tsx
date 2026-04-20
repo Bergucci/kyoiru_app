@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -80,6 +81,7 @@ export default function FriendsTabScreen() {
   const [incomingRequests, setIncomingRequests] = useState<FriendRequestListItem[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequestListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [inviteLink, setInviteLink] = useState<FriendInviteLinkResponse | null>(null);
   const [preparingInvite, setPreparingInvite] = useState(false);
 
@@ -100,9 +102,13 @@ export default function FriendsTabScreen() {
 
   const currentSession = session;
 
-  async function loadFriendsTab() {
+  async function loadFriendsTab(isPullRefresh = false) {
     try {
-      setLoading(true);
+      if (isPullRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const [friendsResponse, incoming, outgoing] = await Promise.all([
         apiRequest<FriendSummary[]>('/friends', {
           token: currentSession.accessToken,
@@ -121,6 +127,7 @@ export default function FriendsTabScreen() {
       Alert.alert('友達タブの取得に失敗しました', toApiErrorMessage(error));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -153,8 +160,9 @@ export default function FriendsTabScreen() {
         token: currentSession.accessToken,
         body: { targetUserId },
       });
-      Alert.alert('申請を送信しました', `@${targetUserId} へ友達申請を送りました。`);
-      await loadFriendsTab();
+      setSearchQuery('');
+      setSearchResults([]);
+      void loadFriendsTab();
     } catch (error) {
       Alert.alert('友達申請に失敗しました', toApiErrorMessage(error));
     }
@@ -216,7 +224,16 @@ export default function FriendsTabScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadFriendsTab(true)}
+            tintColor={colors.accent}
+          />
+        }
+      >
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>友達</Text>
           <Text style={styles.heroText}>
@@ -280,8 +297,17 @@ export default function FriendsTabScreen() {
           {searching ? <ActivityIndicator color={colors.accent} /> : null}
           {searchResults.map((result) => (
             <View key={result.userId} style={styles.listCard}>
-              <Text style={styles.listTitle}>{result.displayName}</Text>
-              <Text style={styles.metaText}>@{result.userId}</Text>
+              <View style={styles.memberRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarLabel}>
+                    {getInitial(result.displayName || result.userId)}
+                  </Text>
+                </View>
+                <View style={styles.memberBody}>
+                  <Text style={styles.listTitle}>{result.displayName}</Text>
+                  <Text style={styles.metaText}>@{result.userId}</Text>
+                </View>
+              </View>
               <Pressable
                 style={styles.secondaryButton}
                 onPress={() => {
@@ -295,12 +321,7 @@ export default function FriendsTabScreen() {
         </View>
 
         <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>友達一覧</Text>
-            <Pressable onPress={() => void loadFriendsTab()}>
-              <Text style={styles.refreshText}>再読込</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.sectionTitle}>友達一覧</Text>
           {loading ? (
             <ActivityIndicator color={colors.accent} />
           ) : friends.length === 0 ? (
@@ -437,19 +458,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.ink,
-  },
-  refreshText: {
-    color: colors.accent,
-    fontWeight: '700',
   },
   metaText: {
     fontSize: 14,
