@@ -1,7 +1,8 @@
 import { Redirect, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { PressableScale } from '../../../src/components';
 
 export default function HelpScreen() {
   const router = useRouter();
@@ -26,50 +27,50 @@ export default function HelpScreen() {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>よく使う項目</Text>
-        <Pressable
+        <PressableScale
           style={styles.linkRow}
           onPress={() => {
             router.push('/(tabs)/settings/subscription-info' as never);
           }}
         >
           <Text style={styles.linkLabel}>見守りプラン説明</Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
           style={styles.linkRow}
           onPress={() => {
             router.push('/(tabs)/settings/location-permission' as never);
           }}
         >
           <Text style={styles.linkLabel}>位置情報の説明</Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
           style={styles.linkRow}
           onPress={() => {
             router.push('/(tabs)/settings/legal' as never);
           }}
         >
           <Text style={styles.linkLabel}>法務リンク</Text>
-        </Pressable>
-        <Pressable
+        </PressableScale>
+        <PressableScale
           style={styles.linkRow}
           onPress={() => {
             router.push('/(tabs)/settings/account-delete' as never);
           }}
         >
           <Text style={styles.linkLabel}>アカウント削除</Text>
-        </Pressable>
+        </PressableScale>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>サポート</Text>
-        <Pressable
+        <PressableScale
           style={styles.linkRow}
           onPress={() => {
             router.push('/(tabs)/settings/contact' as never);
           }}
         >
           <Text style={styles.linkLabel}>サポート / お問い合わせ</Text>
-        </Pressable>
+        </PressableScale>
       </View>
     </ScrollView>
   );

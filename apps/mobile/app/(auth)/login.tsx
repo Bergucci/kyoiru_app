@@ -2,19 +2,8 @@ import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiRequest, toApiErrorMessage } from '../../src/lib/api';
 import {
@@ -25,7 +14,8 @@ import {
   type SocialProvider,
 } from '../../src/lib/social-login';
 import { useSession, type SessionState } from '../../src/session/session-context';
-import { colors } from '../../src/ui/theme';
+import { Mascot, PressableScale } from '../../src/components';
+import { colors, gradients, radii, shadow, spacing, typography } from '../../src/ui/theme';
 
 type AuthMode = 'login' | 'register';
 
@@ -182,269 +172,277 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-      >
-        <View style={styles.hero}>
-          <View style={styles.heroLogo}>
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.heroIcon}
-            />
-            <Text style={styles.heroAppName}>Kyoiru</Text>
-          </View>
-          <Text style={styles.title}>今日いることだけ、そっと伝える。</Text>
-        </View>
-
-        <View style={styles.authCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>ログインまたは新規登録</Text>
-          </View>
-
-          <View style={styles.providerList}>
-            {providerOrder.map((provider) => {
-              const meta = socialProviders[provider];
-              const appearance = providerButtonStyles[provider];
-              const isSubmitting = submittingProvider === provider;
-
-              return (
-                <Pressable
-                  key={provider}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${meta.label} でログイン`}
-                  style={[
-                    styles.providerButton,
-                    {
-                      backgroundColor: appearance.background,
-                      borderColor: appearance.borderColor,
-                    },
-                    isSubmitting && styles.buttonDisabled,
-                  ]}
-                  disabled={isBusy}
-                  onPress={() => {
-                    handleSocialLogin(provider);
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.providerBadge,
-                      { backgroundColor: appearance.badgeBackground },
-                    ]}
-                  >
-                    {renderProviderIcon(
-                      provider,
-                      appearance.badgeForeground,
-                    )}
-                  </View>
-
-                  <View style={styles.providerContent}>
-                    <Text
-                      style={[
-                        styles.providerButtonLabel,
-                        { color: appearance.foreground },
-                      ]}
-                    >
-                      {meta.label}で続ける
-                    </Text>
-                  </View>
-
-                  <View style={styles.providerTrailing}>
-                    {isSubmitting ? (
-                      <ActivityIndicator color={appearance.foreground} />
-                    ) : (
-                      <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color={appearance.foreground}
-                      />
-                    )}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerLabel}>メールアドレスで続ける</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <View style={styles.emailPanel}>
-            <Text style={styles.emailHeading}>{emailHeading}</Text>
-
-            <View style={styles.segment}>
-              <Pressable
-                style={[
-                  styles.segmentButton,
-                  mode === 'login' && styles.segmentButtonActive,
-                ]}
-                disabled={isBusy}
-                onPress={() => {
-                  setMode('login');
-                }}
-              >
-                <Text
-                  style={[
-                    styles.segmentLabel,
-                    mode === 'login' && styles.segmentLabelActive,
-                  ]}
-                >
-                  ログイン
+    <LinearGradient colors={[...gradients.heroFree]} style={styles.gradient}>
+      <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <ScrollView
+            contentContainerStyle={styles.container}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
+          >
+            <View style={styles.hero}>
+              <View style={styles.heroMascotWrap}>
+                <Mascot variant="wave" size={160} animated />
+              </View>
+              <View style={styles.heroCopy}>
+                <Text style={styles.heroAppName}>今日いる</Text>
+                <Text style={styles.title}>
+                  連絡しなくても、今日いることだけ分かる
                 </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.segmentButton,
-                  mode === 'register' && styles.segmentButtonActive,
-                ]}
-                disabled={isBusy}
-                onPress={() => {
-                  setMode('register');
-                }}
-              >
-                <Text
-                  style={[
-                    styles.segmentLabel,
-                    mode === 'register' && styles.segmentLabelActive,
-                  ]}
-                >
-                  新規登録
-                </Text>
-              </Pressable>
+              </View>
             </View>
 
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="メールアドレス"
-              placeholderTextColor="#97a19e"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              keyboardType="email-address"
-              style={styles.input}
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="パスワード"
-              placeholderTextColor="#97a19e"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete={mode === 'login' ? 'password' : 'new-password'}
-              secureTextEntry
-              style={styles.input}
-            />
-            <Pressable
-              style={[styles.primaryButton, isBusy && styles.buttonDisabled]}
-              disabled={isBusy}
-              onPress={() => {
-                void submitEmail();
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#fffdf8" />
-              ) : (
-                <Text style={styles.primaryButtonLabel}>{emailActionLabel}</Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            <View style={styles.authCard}>
+              <View style={styles.cardHandle} />
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>ログインまたは新規登録</Text>
+              </View>
+
+              <View style={styles.providerList}>
+                {providerOrder.map((provider) => {
+                  const meta = socialProviders[provider];
+                  const appearance = providerButtonStyles[provider];
+                  const isSubmitting = submittingProvider === provider;
+
+                  return (
+                    <PressableScale
+                      key={provider}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${meta.label} でログイン`}
+                      hapticStyle="medium"
+                      style={[
+                        styles.providerButton,
+                        {
+                          backgroundColor: appearance.background,
+                          borderColor: appearance.borderColor,
+                        },
+                        isSubmitting && styles.buttonDisabled,
+                      ]}
+                      disabled={isBusy}
+                      onPress={() => {
+                        handleSocialLogin(provider);
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.providerBadge,
+                          { backgroundColor: appearance.badgeBackground },
+                        ]}
+                      >
+                        {renderProviderIcon(
+                          provider,
+                          appearance.badgeForeground,
+                        )}
+                      </View>
+
+                      <View style={styles.providerContent}>
+                        <Text
+                          style={[
+                            styles.providerButtonLabel,
+                            { color: appearance.foreground },
+                          ]}
+                        >
+                          {meta.label}で続ける
+                        </Text>
+                      </View>
+
+                      <View style={styles.providerTrailing}>
+                        {isSubmitting ? (
+                          <ActivityIndicator color={appearance.foreground} />
+                        ) : (
+                          <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={appearance.foreground}
+                          />
+                        )}
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerLabel}>メールアドレスで続ける</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.emailPanel}>
+                <Text style={styles.emailHeading}>{emailHeading}</Text>
+
+                <View style={styles.segment}>
+                  <PressableScale
+                    style={[
+                      styles.segmentButton,
+                      mode === 'login' && styles.segmentButtonActive,
+                    ]}
+                    disabled={isBusy}
+                    onPress={() => {
+                      setMode('login');
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentLabel,
+                        mode === 'login' && styles.segmentLabelActive,
+                      ]}
+                    >
+                      ログイン
+                    </Text>
+                  </PressableScale>
+                  <PressableScale
+                    style={[
+                      styles.segmentButton,
+                      mode === 'register' && styles.segmentButtonActive,
+                    ]}
+                    disabled={isBusy}
+                    onPress={() => {
+                      setMode('register');
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentLabel,
+                        mode === 'register' && styles.segmentLabelActive,
+                      ]}
+                    >
+                      新規登録
+                    </Text>
+                  </PressableScale>
+                </View>
+
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="メールアドレス"
+                  placeholderTextColor="#97a19e"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  style={styles.input}
+                />
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="パスワード"
+                  placeholderTextColor="#97a19e"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete={mode === 'login' ? 'password' : 'new-password'}
+                  secureTextEntry
+                  style={styles.input}
+                />
+                <PressableScale
+                  hapticStyle="medium"
+                  style={[styles.primaryButton, isBusy && styles.buttonDisabled]}
+                  disabled={isBusy}
+                  onPress={() => {
+                    void submitEmail();
+                  }}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#fffdf8" />
+                  ) : (
+                    <Text style={styles.primaryButtonLabel}>{emailActionLabel}</Text>
+                  )}
+                </PressableScale>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
-    backgroundColor: '#efe7d7',
+    backgroundColor: 'transparent',
   },
   container: {
     flexGrow: 1,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 24,
-    gap: 14,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing['2xl'],
+    justifyContent: 'space-between',
+    gap: spacing.lg,
   },
   hero: {
-    paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 20,
-    borderRadius: 26,
-    backgroundColor: colors.accentStrong,
-    gap: 12,
-  },
-  heroLogo: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    minHeight: '40%',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing['2xl'],
+    gap: spacing.lg,
   },
-  heroIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+  heroMascotWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroCopy: {
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   heroAppName: {
-    color: '#fffdf8',
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    ...typography.display,
+    color: colors.accentStrong,
   },
   title: {
-    color: '#fffdf8',
-    fontSize: 22,
-    fontWeight: '700',
-    lineHeight: 26,
+    ...typography.body,
+    color: colors.accentStrong,
+    textAlign: 'center',
+    maxWidth: 280,
   },
   authCard: {
-    padding: 18,
-    borderRadius: 24,
-    backgroundColor: '#fbf8f1',
+    padding: spacing.xl,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#ddd4c5',
-    gap: 14,
-    shadowColor: '#173d35',
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 2,
+    borderColor: colors.border,
+    gap: spacing.lg,
+    ...shadow.card,
+  },
+  cardHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
   },
   sectionHeader: {
-    gap: 4,
+    gap: spacing.xs,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...typography.title,
     color: colors.ink,
   },
   providerList: {
-    gap: 8,
+    gap: spacing.sm,
   },
   providerButton: {
-    minHeight: 60,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
   },
   providerBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -452,8 +450,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   providerButtonLabel: {
-    fontSize: 17,
-    fontWeight: '700',
+    ...typography.subtitle,
   },
   providerTrailing: {
     minWidth: 24,
@@ -462,33 +459,31 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ddd4c5',
+    backgroundColor: colors.divider,
   },
   dividerLabel: {
-    color: '#7d8782',
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.caption,
+    color: colors.hint,
   },
   emailPanel: {
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: '#f3eddf',
-    gap: 10,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceAlt,
+    gap: spacing.sm,
   },
   emailHeading: {
-    fontSize: 17,
-    fontWeight: '700',
+    ...typography.subtitle,
     color: colors.ink,
   },
   segment: {
     flexDirection: 'row',
-    borderRadius: 14,
-    backgroundColor: '#e5dcc9',
+    borderRadius: radii.md,
+    backgroundColor: colors.secondarySurface,
     padding: 4,
   },
   segmentButton: {
@@ -498,7 +493,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   segmentButtonActive: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: colors.surface,
   },
   segmentLabel: {
     color: colors.muted,
@@ -508,10 +503,10 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   input: {
-    borderRadius: 14,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: '#d7cfbf',
-    backgroundColor: '#ffffff',
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.white,
     paddingHorizontal: 14,
     paddingVertical: 13,
     color: colors.ink,
@@ -519,14 +514,13 @@ const styles = StyleSheet.create({
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: radii.md,
     paddingVertical: 14,
     backgroundColor: colors.accentStrong,
   },
   primaryButtonLabel: {
     color: '#fffdf8',
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.subtitle,
   },
   buttonDisabled: {
     opacity: 0.7,

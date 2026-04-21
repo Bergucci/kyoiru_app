@@ -1,32 +1,34 @@
 import { Redirect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ApiError, apiRequest, toApiErrorMessage } from '../src/lib/api';
 import { useSession, type SessionUser } from '../src/session/session-context';
-import { colors } from '../src/ui/theme';
+import { Confetti, Mascot, MascotCheerOverlay, PressableScale } from '../src/components';
+import { usePalette } from '../src/ui/use-palette';
+import { colors, radii, shadow, spacing, typography } from '../src/ui/theme';
 
 export default function InitialProfileScreen() {
   const router = useRouter();
   const { session, updateSessionUser, clearSession } = useSession();
+  const palette = usePalette();
   const [displayName, setDisplayName] = useState(session?.user.displayName ?? '');
   const [userId, setUserId] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [focusedField, setFocusedField] = useState<'displayName' | 'userId' | null>(null);
+  const [completionTick, setCompletionTick] = useState(0);
+  const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (!session) {
     return <Redirect href={'/(auth)/login' as never} />;
@@ -78,6 +80,8 @@ export default function InitialProfileScreen() {
       return;
     }
 
+    let shouldDelayNavigate = false;
+
     try {
       setSubmitting(true);
 
@@ -97,7 +101,11 @@ export default function InitialProfileScreen() {
       });
 
       updateSessionUser(response);
-      router.replace('/');
+      setCompletionTick((current) => current + 1);
+      shouldDelayNavigate = true;
+      navigationTimeoutRef.current = setTimeout(() => {
+        router.replace('/');
+      }, 900);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         clearSession();
@@ -106,7 +114,9 @@ export default function InitialProfileScreen() {
       }
       Alert.alert('プロフィール設定に失敗しました', toApiErrorMessage(error));
     } finally {
-      setSubmitting(false);
+      if (!shouldDelayNavigate) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -123,13 +133,14 @@ export default function InitialProfileScreen() {
         automaticallyAdjustKeyboardInsets
       >
         <View style={styles.hero}>
-          <Text style={styles.heroTitle}>プロフィール設定</Text>
+          <Mascot variant="cheer" size={120} />
+          <Text style={styles.heroTitle}>はじめまして！</Text>
           <Text style={styles.heroSubtitle}>ホームへ進む前に、あなたのプロフィールを設定しましょう。</Text>
         </View>
 
         <View style={styles.card}>
           <View style={styles.avatarSection}>
-            <Pressable style={styles.avatarWrapper} onPress={() => { void pickAvatar(); }}>
+            <PressableScale style={styles.avatarWrapper} onPress={() => { void pickAvatar(); }}>
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
               ) : (
@@ -140,10 +151,10 @@ export default function InitialProfileScreen() {
                   />
                 </View>
               )}
-              <View style={styles.avatarBadge}>
+              <View style={[styles.avatarBadge, { backgroundColor: palette.ctaBg }]}>
                 <Ionicons name="camera" size={14} color="#ffffff" />
               </View>
-            </Pressable>
+            </PressableScale>
             <Text style={styles.avatarHint}>タップして写真を選ぶ</Text>
           </View>
 
@@ -153,9 +164,20 @@ export default function InitialProfileScreen() {
               <TextInput
                 value={displayName}
                 onChangeText={setDisplayName}
+                onFocus={() => {
+                  setFocusedField('displayName');
+                }}
+                onBlur={() => {
+                  setFocusedField((current) =>
+                    current === 'displayName' ? null : current,
+                  );
+                }}
                 placeholder="例：山田 太郎"
                 placeholderTextColor="#97a19e"
-                style={styles.input}
+                style={[
+                  styles.input,
+                  focusedField === 'displayName' && { borderColor: palette.ctaBg },
+                ]}
               />
             </View>
 
@@ -164,29 +186,49 @@ export default function InitialProfileScreen() {
               <TextInput
                 value={userId}
                 onChangeText={setUserId}
+                onFocus={() => {
+                  setFocusedField('userId');
+                }}
+                onBlur={() => {
+                  setFocusedField((current) => (current === 'userId' ? null : current));
+                }}
                 placeholder="例：taro_yamada"
                 placeholderTextColor="#97a19e"
                 autoCapitalize="none"
                 autoCorrect={false}
-                style={styles.input}
+                style={[
+                  styles.input,
+                  focusedField === 'userId' && { borderColor: palette.ctaBg },
+                ]}
               />
               <Text style={styles.fieldHint}>半角英数字・アンダースコア（3〜30文字）</Text>
             </View>
           </View>
 
-          <Pressable
-            style={[styles.primaryButton, submitting && styles.buttonDisabled]}
+          <PressableScale
+            hapticStyle="medium"
+            style={[
+              styles.primaryButton,
+              { backgroundColor: palette.ctaBg },
+              submitting && styles.buttonDisabled,
+            ]}
             disabled={submitting}
             onPress={() => { void submit(); }}
           >
             {submitting ? (
-              <ActivityIndicator color="#fffdf8" />
+              <ActivityIndicator color={palette.ctaText} />
             ) : (
-              <Text style={styles.primaryButtonLabel}>プロフィールを確定する</Text>
+              <Text style={[styles.primaryButtonLabel, { color: palette.ctaText }]}>
+                プロフィールを確定する
+              </Text>
             )}
-          </Pressable>
+          </PressableScale>
         </View>
       </ScrollView>
+      <View pointerEvents="none" style={styles.overlayLayer}>
+        <Confetti trigger={completionTick} />
+        <MascotCheerOverlay trigger={completionTick} />
+      </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -195,50 +237,44 @@ export default function InitialProfileScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#efe7d7',
+    backgroundColor: colors.authBg,
   },
 
   container: {
     flexGrow: 1,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 32,
-    gap: 14,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing['3xl'],
+    gap: spacing.lg,
   },
   hero: {
-    paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 20,
-    borderRadius: 26,
-    backgroundColor: colors.accentStrong,
-    gap: 8,
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
   },
   heroTitle: {
-    color: '#fffdf8',
-    fontSize: 24,
-    fontWeight: '700',
+    ...typography.display,
+    color: colors.ink,
   },
   heroSubtitle: {
-    color: '#c8dbd4',
-    fontSize: 14,
-    lineHeight: 20,
+    ...typography.body,
+    color: colors.muted,
+    textAlign: 'center',
   },
   card: {
-    padding: 20,
-    borderRadius: 24,
-    backgroundColor: '#fbf8f1',
+    padding: spacing.xl,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#ddd4c5',
-    gap: 20,
-    shadowColor: '#173d35',
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 2,
+    borderColor: colors.border,
+    gap: spacing.xl,
+    ...shadow.card,
   },
   avatarSection: {
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   avatarWrapper: {
     position: 'relative',
@@ -252,9 +288,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#f0e8d8',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 2,
-    borderColor: '#ddd4c5',
+    borderColor: colors.border,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -271,54 +307,52 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.accentStrong,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fbf8f1',
+    borderColor: colors.surface,
   },
   avatarHint: {
-    fontSize: 12,
-    color: '#7d8782',
+    ...typography.caption,
+    color: colors.hint,
   },
   fieldGroup: {
-    gap: 14,
+    gap: spacing.md,
   },
   field: {
-    gap: 6,
+    gap: spacing.xs,
   },
   fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...typography.caption,
     color: colors.ink,
   },
   input: {
-    borderRadius: 14,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: '#d7cfbf',
-    backgroundColor: '#ffffff',
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.white,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 15,
     color: colors.ink,
   },
   fieldHint: {
-    fontSize: 11,
-    color: '#97a19e',
+    ...typography.caption,
+    color: colors.hint,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: radii.md,
     paddingVertical: 14,
-    backgroundColor: colors.accentStrong,
   },
   primaryButtonLabel: {
-    color: '#fffdf8',
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.subtitle,
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  overlayLayer: {
+    ...StyleSheet.absoluteFillObject,
   },
 });

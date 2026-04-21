@@ -1,18 +1,12 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiRequest, toApiErrorMessage } from '../../src/lib/api';
 import { useApi } from '../../src/lib/use-api';
 import { toGroupTypeLabel } from '../../src/lib/format';
 import { useSession } from '../../src/session/session-context';
 import { colors } from '../../src/ui/theme';
+import { PressableScale } from '../../src/components';
 
 interface GroupInvitePreview {
   groupId: string;
@@ -81,12 +75,12 @@ export default function GroupInviteScreen() {
           <Text style={styles.body}>
             このリンクを使うにはログインが必要です。ログイン後に再度このリンクを開いてください。
           </Text>
-          <Pressable
+          <PressableScale
             style={styles.primaryButton}
             onPress={() => { router.replace('/(auth)/login' as never); }}
           >
             <Text style={styles.primaryButtonLabel}>ログイン画面へ</Text>
-          </Pressable>
+          </PressableScale>
         </View>
       </ScrollView>
     );
@@ -125,7 +119,8 @@ export default function GroupInviteScreen() {
                 : 'この招待リンクは現在利用できません。'}
             </Text>
 
-            <Pressable
+            <PressableScale
+              hapticStyle="medium"
               style={[
                 styles.primaryButton,
                 (!preview.joinable || joining) && styles.buttonDisabled,
@@ -138,7 +133,7 @@ export default function GroupInviteScreen() {
               ) : (
                 <Text style={styles.primaryButtonLabel}>グループに参加する</Text>
               )}
-            </Pressable>
+            </PressableScale>
           </>
         ) : null}
       </View>

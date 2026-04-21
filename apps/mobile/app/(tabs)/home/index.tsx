@@ -1,15 +1,8 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { CheckinButton, Confetti, Mascot, MascotCheerOverlay, MoodSticker, ScreenHeader, StreakDots, Toast, PressableScale } from '../../../src/components';
 import { toApiErrorMessage } from '../../../src/lib/api';
 import {
   formatDateTime,
@@ -18,8 +11,8 @@ import {
 } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
 import { useApi } from '../../../src/lib/use-api';
-import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
+import { colors, spacing, typography } from '../../../src/ui/theme';
 
 interface GroupSummary {
   groupId: string;
@@ -30,22 +23,22 @@ interface GroupSummary {
 }
 
 interface CheckinHistoryResponse {
-  days: Array<{
+  days: {
     businessDateJst: string;
     checkedIn: boolean;
     checkedInAt: string | null;
     mood: string | null;
     note: string | null;
     state: string;
-  }>;
+  }[];
 }
 
-const moodOptions: { label: string; value: string }[] = [
-  { label: '😊 元気', value: '元気' },
-  { label: '🙂 ふつう', value: 'ふつう' },
-  { label: '😴 眠い', value: '眠い' },
-  { label: '😓 忙しい', value: '忙しい' },
-  { label: '😢 しんどい', value: 'しんどい' },
+const moodOptions = [
+  { emoji: '😊', label: '元気', value: '元気' },
+  { emoji: '🙂', label: 'ふつう', value: 'ふつう' },
+  { emoji: '😴', label: '眠い', value: '眠い' },
+  { emoji: '😓', label: '忙しい', value: '忙しい' },
+  { emoji: '😢', label: 'しんどい', value: 'しんどい' },
 ];
 
 export default function HomeTabScreen() {
@@ -56,7 +49,9 @@ export default function HomeTabScreen() {
   const [loading, setLoading] = useState(true);
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
   const [submittingMood, setSubmittingMood] = useState(false);
+  const [pendingMoodValue, setPendingMoodValue] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState('');
+  const [completionTick, setCompletionTick] = useState(0);
 
   useEffect(() => {
     if (session?.accessToken) {
@@ -74,6 +69,11 @@ export default function HomeTabScreen() {
 
   const { request } = useApi();
   const today = history?.days[0] ?? null;
+  const checkinButtonState = today?.checkedIn
+    ? 'done'
+    : submittingCheckin
+      ? 'submitting'
+      : 'idle';
 
   async function loadHomeData() {
     try {
@@ -84,6 +84,7 @@ export default function HomeTabScreen() {
       ]);
       setGroups(groupsResponse);
       setHistory(historyResponse);
+      setPendingMoodValue(historyResponse.days[0]?.mood ?? null);
     } catch (error) {
       Alert.alert('ホームの取得に失敗しました', toApiErrorMessage(error));
     } finally {
@@ -98,6 +99,8 @@ export default function HomeTabScreen() {
         method: 'POST',
       });
       await loadHomeData();
+      setCompletionTick((currentTick) => currentTick + 1);
+      Toast.show({ message: '今日いる、届いたよ！', type: 'success', silent: true });
     } catch (error) {
       Alert.alert('今日いるの送信に失敗しました', toApiErrorMessage(error));
     } finally {
@@ -107,6 +110,7 @@ export default function HomeTabScreen() {
 
   const submitMood = async (mood: string) => {
     try {
+      setPendingMoodValue(mood);
       setSubmittingMood(true);
       await request('/me/mood-stamp', {
         method: 'POST',
@@ -115,6 +119,7 @@ export default function HomeTabScreen() {
       setNoteInput('');
       await loadHomeData();
     } catch (error) {
+      setPendingMoodValue(null);
       Alert.alert('気分スタンプの送信に失敗しました', toApiErrorMessage(error));
     } finally {
       setSubmittingMood(false);
@@ -122,110 +127,123 @@ export default function HomeTabScreen() {
   };
 
   return (
-    <KeyboardAwareScrollView contentContainerStyle={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>今日の状態</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : (
-          <>
-            <Text style={styles.statusText}>
-              状態: {toAliveStateLabel(today?.state ?? null)}
-            </Text>
-            <Text style={styles.metaText}>
-              最終反応: {formatDateTime(today?.checkedInAt ?? null)}
-            </Text>
-            <Text style={styles.metaText}>気分: {today?.mood ?? '未設定'}</Text>
-            {today?.note ? (
-              <Text style={styles.noteText}>「{today.note}」</Text>
-            ) : null}
-            <Pressable
-              style={[
-                styles.primaryButton,
-                (today?.checkedIn || submittingCheckin) && styles.buttonDisabled,
-              ]}
-              disabled={today?.checkedIn || submittingCheckin}
-              onPress={() => { void submitCheckin(); }}
-            >
-              <Text style={styles.primaryButtonLabel}>
-                {today?.checkedIn ? '今日反応済み' : '今日いる'}
-              </Text>
-            </Pressable>
-          </>
-        )}
-      </View>
-
-      {today?.checkedIn && !today.mood ? (
+    <View style={styles.screen}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.container}>
+        <ScreenHeader title="今日いる" />
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>気分スタンプ</Text>
-          <Text style={styles.metaText}>
-            今日の気分と一言を送れます。
-          </Text>
-          <TextInput
-            style={styles.noteInput}
-            value={noteInput}
-            onChangeText={setNoteInput}
-            placeholder="今日の一言（任意）"
-            placeholderTextColor={colors.hint}
-            maxLength={100}
-          />
-          <View style={styles.chipWrap}>
-            {moodOptions.map((mood) => (
-              <Pressable
-                key={mood.value}
-                style={[styles.chip, submittingMood && styles.buttonDisabled]}
-                disabled={submittingMood}
-                onPress={() => { void submitMood(mood.value); }}
-              >
-                <Text style={styles.chipLabel}>{mood.label}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>今日の状態</Text>
+          {loading ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : (
+            <>
+              <Text style={styles.statusText}>
+                状態: {toAliveStateLabel(today?.state ?? null)}
+              </Text>
+              <Text style={styles.metaText}>
+                最終反応: {formatDateTime(today?.checkedInAt ?? null)}
+              </Text>
+              <Text style={styles.metaText}>気分: {today?.mood ?? '未設定'}</Text>
+              {today?.note ? (
+                <Text style={styles.noteText}>「{today.note}」</Text>
+              ) : null}
+              <StreakDots history={history?.days ?? []} />
+              <CheckinButton
+                onPress={() => {
+                  void submitCheckin();
+                }}
+                state={checkinButtonState}
+              />
+            </>
+          )}
         </View>
-      ) : null}
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>所属グループ</Text>
-
-        <Pressable
-          style={styles.createGroupRow}
-          onPress={() => { router.push('/(tabs)/home/create-group' as never); }}
-        >
-          <View style={styles.createGroupIcon}>
-            <Ionicons name="people" size={22} color={colors.accentStrong} />
+        {today?.checkedIn && !today.mood ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>気分スタンプ</Text>
+            <Text style={styles.metaText}>
+              今日の気分と一言を送れます。
+            </Text>
+            <TextInput
+              style={styles.noteInput}
+              value={noteInput}
+              onChangeText={setNoteInput}
+              placeholder="今日の一言（任意）"
+              placeholderTextColor={colors.hint}
+              maxLength={100}
+            />
+            <View style={styles.stickerWrap}>
+              {moodOptions.map((mood) => (
+                <MoodSticker
+                  key={mood.value}
+                  disabled={submittingMood}
+                  emoji={mood.emoji}
+                  label={mood.label}
+                  onPress={() => {
+                    void submitMood(mood.value);
+                  }}
+                  selected={pendingMoodValue === mood.value || today?.mood === mood.value}
+                />
+              ))}
+            </View>
           </View>
-          <Text style={styles.createGroupLabel}>グループを作成</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.hint} />
-        </Pressable>
+        ) : null}
 
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : groups.length === 0 ? (
-          <Text style={styles.metaText}>まだ所属グループがありません。</Text>
-        ) : (
-          groups.map((group) => (
-            <Pressable
-              key={group.groupId}
-              style={styles.groupCard}
-              onPress={() => {
-                router.push({
-                  pathname: '/(tabs)/home/groups/[groupId]',
-                  params: { groupId: group.groupId },
-                } as never);
-              }}
-            >
-              <Text style={styles.groupTitle}>{group.name}</Text>
-              <Text style={styles.metaText}>{toGroupTypeLabel(group.type)}</Text>
-              <Text style={styles.metaText}>メンバー数: {group.memberCount}</Text>
-            </Pressable>
-          ))
-        )}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>所属グループ</Text>
+
+          <PressableScale
+            style={styles.createGroupRow}
+            onPress={() => { router.push('/(tabs)/home/create-group' as never); }}
+          >
+            <View style={styles.createGroupIcon}>
+              <Ionicons name="people" size={22} color={colors.accentStrong} />
+            </View>
+            <Text style={styles.createGroupLabel}>グループを作成</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.hint} />
+          </PressableScale>
+
+          {loading ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : groups.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Mascot size={120} variant="default" />
+              <Text style={styles.emptyStateText}>
+                まだグループがないよ。作るか、招待されてみよう
+              </Text>
+            </View>
+          ) : (
+            groups.map((group) => (
+              <PressableScale
+                key={group.groupId}
+                style={styles.groupCard}
+                onPress={() => {
+                  router.push({
+                    pathname: '/(tabs)/home/groups/[groupId]',
+                    params: { groupId: group.groupId },
+                  } as never);
+                }}
+              >
+                <Text style={styles.groupTitle}>{group.name}</Text>
+                <Text style={styles.metaText}>{toGroupTypeLabel(group.type)}</Text>
+                <Text style={styles.metaText}>メンバー数: {group.memberCount}</Text>
+              </PressableScale>
+            ))
+          )}
+        </View>
+      </KeyboardAwareScrollView>
+      <View pointerEvents="box-none" style={styles.overlayLayer}>
+        <Confetti trigger={completionTick} />
+        <MascotCheerOverlay trigger={completionTick} />
       </View>
-    </KeyboardAwareScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.pageBg,
+    flex: 1,
+  },
   container: {
     padding: 20,
     gap: 16,
@@ -255,6 +273,19 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
   },
+  emptyState: {
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingVertical: spacing['3xl'],
+  },
+  emptyStateText: {
+    ...typography.body,
+    color: colors.muted,
+    textAlign: 'center',
+  },
+  overlayLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -276,20 +307,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontStyle: 'italic',
   },
-  primaryButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    paddingVertical: 14,
-    backgroundColor: colors.accent,
-  },
-  primaryButtonLabel: {
-    color: '#fffdf8',
-    fontWeight: '700',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
   noteInput: {
     borderRadius: 14,
     borderWidth: 1,
@@ -300,20 +317,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
   },
-  chipWrap: {
+  stickerWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: colors.accentSoft,
-  },
-  chipLabel: {
-    color: colors.accentStrong,
-    fontWeight: '600',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   createGroupRow: {
     flexDirection: 'row',

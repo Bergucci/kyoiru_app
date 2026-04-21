@@ -1,14 +1,6 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import {
@@ -22,6 +14,7 @@ import {
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
+import { PressableScale } from '../../../src/components';
 
 interface MonitoringRelationshipSummary {
   id: string;
@@ -323,7 +316,7 @@ export default function MonitoringDetailScreen() {
             </Text>
             <View style={styles.segment}>
               {(['off', 'on_overdue', 'always'] as const).map((value) => (
-                <Pressable
+                <PressableScale
                   key={value}
                   style={[
                     styles.segmentButton,
@@ -342,11 +335,12 @@ export default function MonitoringDetailScreen() {
                   >
                     {toGpsShareModeLabel(value)}
                   </Text>
-                </Pressable>
+                </PressableScale>
               ))}
             </View>
             {isTargetEditor ? (
-              <Pressable
+              <PressableScale
+                hapticStyle="medium"
                 style={[styles.primaryButton, savingGps && styles.buttonDisabled]}
                 disabled={savingGps}
                 onPress={() => {
@@ -354,7 +348,7 @@ export default function MonitoringDetailScreen() {
                 }}
               >
                 <Text style={styles.primaryButtonLabel}>GPS共有設定を保存</Text>
-              </Pressable>
+              </PressableScale>
             ) : null}
           </View>
 
@@ -366,7 +360,7 @@ export default function MonitoringDetailScreen() {
             </Text>
             <View style={styles.segment}>
               {[1, 2, 3].map((value) => (
-                <Pressable
+                <PressableScale
                   key={value}
                   style={[
                     styles.segmentButton,
@@ -385,11 +379,12 @@ export default function MonitoringDetailScreen() {
                   >
                     {value} 回
                   </Text>
-                </Pressable>
+                </PressableScale>
               ))}
             </View>
             {isTargetEditor ? (
-              <Pressable
+              <PressableScale
+                hapticStyle="medium"
                 style={[styles.primaryButton, savingCheckin && styles.buttonDisabled]}
                 disabled={savingCheckin}
                 onPress={() => {
@@ -397,7 +392,7 @@ export default function MonitoringDetailScreen() {
                 }}
               >
                 <Text style={styles.primaryButtonLabel}>複数回チェックインを保存</Text>
-              </Pressable>
+              </PressableScale>
             ) : null}
           </View>
 
@@ -429,7 +424,8 @@ export default function MonitoringDetailScreen() {
                 </Text>
               ) : null}
               {isTargetEditor ? (
-                <Pressable
+                <PressableScale
+                  hapticStyle="medium"
                   style={[styles.primaryButton, savingContact && styles.buttonDisabled]}
                   disabled={savingContact}
                   onPress={() => {
@@ -437,7 +433,7 @@ export default function MonitoringDetailScreen() {
                   }}
                 >
                   <Text style={styles.primaryButtonLabel}>緊急連絡先を保存</Text>
-                </Pressable>
+                </PressableScale>
               ) : null}
             </View>
           ) : null}
@@ -446,14 +442,14 @@ export default function MonitoringDetailScreen() {
           dashboardItem.hasEmergencyContact ? (
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>最終段階の緊急連絡先</Text>
-              <Pressable
+              <PressableScale
                 style={styles.primaryButton}
                 onPress={() => {
                   void openFinalStageEmergencyContact();
                 }}
               >
                 <Text style={styles.primaryButtonLabel}>緊急連絡先を取得</Text>
-              </Pressable>
+              </PressableScale>
               {finalStageContact ? (
                 <View style={styles.contactCard}>
                   <Text style={styles.metaText}>
@@ -477,7 +473,7 @@ export default function MonitoringDetailScreen() {
               <Text style={styles.metaText}>
                 同意を撤回すると自動復元されず、再開には再リクエストが必要です。
               </Text>
-              <Pressable
+              <PressableScale
                 style={[styles.dangerButton, revoking && styles.buttonDisabled]}
                 disabled={revoking}
                 onPress={() => {
@@ -498,18 +494,18 @@ export default function MonitoringDetailScreen() {
                 }}
               >
                 <Text style={styles.dangerLabel}>同意を撤回する</Text>
-              </Pressable>
+              </PressableScale>
             </View>
           ) : null}
 
-          <Pressable
+          <PressableScale
             style={styles.secondaryButton}
             onPress={() => {
               router.back();
             }}
           >
             <Text style={styles.secondaryButtonLabel}>見守り一覧へ戻る</Text>
-          </Pressable>
+          </PressableScale>
         </>
       )}
     </KeyboardAwareScrollView>

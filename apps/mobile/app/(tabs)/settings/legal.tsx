@@ -1,8 +1,9 @@
 import { Redirect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { PressableScale } from '../../../src/components';
 
 const legalItems = [
   { label: 'プライバシーポリシー', href: '/(tabs)/settings/privacy-policy' },
@@ -26,14 +27,14 @@ export default function LegalScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.menuList}>
         {legalItems.map((item, index) => (
-          <Pressable
+          <PressableScale
             key={item.href}
             style={[styles.menuItem, index < legalItems.length - 1 && styles.menuItemBorder]}
             onPress={() => { router.push(item.href as never); }}
           >
             <Text style={styles.menuLabel}>{item.label}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.hint} />
-          </Pressable>
+          </PressableScale>
         ))}
       </View>
     </ScrollView>

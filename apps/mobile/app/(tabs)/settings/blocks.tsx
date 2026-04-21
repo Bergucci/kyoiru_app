@@ -1,18 +1,11 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { PressableScale } from '../../../src/components';
 
 interface BlockListItem {
   blockId: string;
@@ -93,14 +86,14 @@ export default function BlocksScreen() {
                 <Text style={styles.blockName}>{block.target.displayName}</Text>
                 <Text style={styles.body}>@{block.target.userId}</Text>
               </View>
-              <Pressable
+              <PressableScale
                 style={styles.secondaryButton}
                 onPress={() => {
                   void unblock(block.blockId);
                 }}
               >
                 <Text style={styles.secondaryLabel}>解除</Text>
-              </Pressable>
+              </PressableScale>
             </View>
           ))
         )}

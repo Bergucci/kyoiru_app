@@ -1,18 +1,11 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { PressableScale } from '../../../src/components';
 
 interface GroupSummary {
   groupId: string;
@@ -153,8 +146,9 @@ export default function NotificationSettingsScreen() {
                 const isActive = group.notificationLevel === level.value;
                 const isSaving = savingGroupId === group.groupId;
                 return (
-                  <Pressable
+                  <PressableScale
                     key={level.value}
+                    hapticStyle="medium"
                     style={[styles.levelRow, isActive && styles.levelRowActive]}
                     disabled={isSaving}
                     onPress={() => {
@@ -175,7 +169,7 @@ export default function NotificationSettingsScreen() {
                     {isSaving && savingGroupId === group.groupId && isActive && (
                       <ActivityIndicator size="small" color={colors.accent} />
                     )}
-                  </Pressable>
+                  </PressableScale>
                 );
               })}
             </View>

@@ -1,26 +1,12 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
-import { useApi } from '../../../src/lib/use-api';
 import { formatDateTime, toEntitlementLabel } from '../../../src/lib/format';
+import { useEntitlement } from '../../../src/session/entitlement-context';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
-
-interface EntitlementResponse {
-  planName: string;
-  status: string;
-  currentPeriodExpiresAt: string | null;
-  gracePeriodExpiresAt: string | null;
-  isActiveForFeatures: boolean;
-}
+import { PressableScale } from '../../../src/components';
 
 interface SubscriptionCopy {
   planName: string;
@@ -37,7 +23,7 @@ interface SubscriptionCopy {
 export default function SubscriptionManagementScreen() {
   const router = useRouter();
   const { session } = useSession();
-  const [entitlement, setEntitlement] = useState<EntitlementResponse | null>(null);
+  const { entitlement, loading: entitlementLoading } = useEntitlement();
   const [subscriptionCopy, setSubscriptionCopy] = useState<SubscriptionCopy | null>(
     null,
   );
@@ -58,17 +44,11 @@ export default function SubscriptionManagementScreen() {
     return <Redirect href={'/initial-profile' as never} />;
   }
 
-  const { request } = useApi();
-
   async function loadSubscription() {
     try {
       setLoading(true);
       setLoadError(null);
-      const [entitlementResponse, copyResponse] = await Promise.all([
-        request<EntitlementResponse>('/billing/entitlement', {}),
-        apiRequest<SubscriptionCopy>('/billing/subscription-copy'),
-      ]);
-      setEntitlement(entitlementResponse);
+      const copyResponse = await apiRequest<SubscriptionCopy>('/billing/subscription-copy');
       setSubscriptionCopy(copyResponse);
     } catch (error) {
       setLoadError(toApiErrorMessage(error));
@@ -86,14 +66,14 @@ export default function SubscriptionManagementScreen() {
         </Text>
       </View>
 
-      {loading ? (
+      {loading || (entitlementLoading && !entitlement) ? (
         <ActivityIndicator color={colors.accent} />
       ) : loadError ? (
         <View style={styles.card}>
           <Text style={styles.body}>{loadError}</Text>
-          <Pressable style={styles.secondaryButton} onPress={() => { void loadSubscription(); }}>
+          <PressableScale style={styles.secondaryButton} onPress={() => { void loadSubscription(); }}>
             <Text style={styles.secondaryButtonLabel}>再読み込み</Text>
-          </Pressable>
+          </PressableScale>
         </View>
       ) : !entitlement || !subscriptionCopy ? null : (
         <>
@@ -121,18 +101,18 @@ export default function SubscriptionManagementScreen() {
             <Text style={styles.body}>{subscriptionCopy.freeTrial}</Text>
             <Text style={styles.body}>{subscriptionCopy.autoRenew}</Text>
             <Text style={styles.body}>{subscriptionCopy.cancellationMethod}</Text>
-            <Pressable
+            <PressableScale
               style={styles.secondaryButton}
               onPress={() => { router.push('/(tabs)/settings/terms' as never); }}
             >
               <Text style={styles.secondaryButtonLabel}>利用規約を開く</Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               style={styles.secondaryButton}
               onPress={() => { router.push('/(tabs)/settings/privacy-policy' as never); }}
             >
               <Text style={styles.secondaryButtonLabel}>プライバシーポリシーを開く</Text>
-            </Pressable>
+            </PressableScale>
           </View>
         </>
       )}

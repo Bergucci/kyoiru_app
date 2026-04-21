@@ -1,19 +1,12 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
+import { PressableScale } from '../../../src/components';
 
 const CATEGORIES = [
   '一般的なご質問',
@@ -107,7 +100,7 @@ export default function ContactScreen() {
           <Text style={[styles.label, styles.labelTop]}>お問い合わせ種別 <Text style={styles.required}>必須</Text></Text>
           <View style={styles.categoryList}>
             {CATEGORIES.map((cat) => (
-              <Pressable
+              <PressableScale
                 key={cat}
                 style={[styles.categoryChip, category === cat && styles.categoryChipSelected]}
                 onPress={() => setCategory(cat)}
@@ -115,7 +108,7 @@ export default function ContactScreen() {
                 <Text style={[styles.categoryChipText, category === cat && styles.categoryChipTextSelected]}>
                   {cat}
                 </Text>
-              </Pressable>
+              </PressableScale>
             ))}
           </View>
 
@@ -134,7 +127,8 @@ export default function ContactScreen() {
           <Text style={styles.charCount}>{message.length} / 3000</Text>
         </View>
 
-        <Pressable
+        <PressableScale
+          hapticStyle="medium"
           style={[styles.submitButton, sending && styles.submitButtonDisabled]}
           onPress={handleSubmit}
           disabled={sending}
@@ -144,7 +138,7 @@ export default function ContactScreen() {
           ) : (
             <Text style={styles.submitButtonText}>送信する</Text>
           )}
-        </Pressable>
+        </PressableScale>
 
         <Text style={styles.notice}>
           ※ お問い合わせいただいた内容は、回答のためにのみ利用いたします。

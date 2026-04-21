@@ -14,6 +14,32 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   return dateTimeFormatter.format(date);
 }
 
+export function formatRelativeMinutes(
+  iso: string | null | undefined,
+): string {
+  if (!iso) {
+    return '未反応';
+  }
+
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60_000);
+
+  if (minutes < 1) {
+    return 'ついさっき';
+  }
+  if (minutes < 60) {
+    return `${minutes}分前`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}時間前`;
+  }
+
+  const days = Math.floor(hours / 24);
+  return `${days}日前`;
+}
+
 export function toGroupTypeLabel(type: string): string {
   return type === 'family' ? '家族向け' : '友人・恋人向け';
 }

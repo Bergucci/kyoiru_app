@@ -1,21 +1,12 @@
 import { Redirect, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { resolveMediaUrl, toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
+import { PressableScale } from '../../../src/components';
 
 interface FriendSummary {
   friendshipId: string;
@@ -45,9 +36,9 @@ export default function CreateGroupScreen() {
       navigation.setOptions({
         title: '友達を選択',
         headerRight: () => (
-          <Pressable onPress={goNext} hitSlop={12}>
+          <PressableScale onPress={goNext} hitSlop={12}>
             <Text style={styles.headerButton}>次へ</Text>
-          </Pressable>
+          </PressableScale>
         ),
       });
     } else {
@@ -147,14 +138,14 @@ export default function CreateGroupScreen() {
         {selectedFriends.length > 0 && (
           <View style={styles.chipRow}>
             {selectedFriends.map((f) => (
-              <Pressable
+              <PressableScale
                 key={f.friendshipId}
                 style={styles.chip}
                 onPress={() => { toggleFriend(f.friend.userId); }}
               >
                 <Text style={styles.chipText}>{f.friend.displayName}</Text>
                 <Text style={styles.chipRemove}>✕</Text>
-              </Pressable>
+              </PressableScale>
             ))}
           </View>
         )}
@@ -171,7 +162,7 @@ export default function CreateGroupScreen() {
             keyExtractor={(item) => item.friendshipId}
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
-              <Pressable
+              <PressableScale
                 style={styles.friendRow}
                 onPress={() => {
                   toggleFriend(item.friend.userId);
@@ -196,17 +187,17 @@ export default function CreateGroupScreen() {
                     <Text style={styles.checkMarkText}>✓</Text>
                   </View>
                 )}
-              </Pressable>
+              </PressableScale>
             )}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
           />
         )}
 
-        <Pressable style={styles.nextButton} onPress={goNext}>
+        <PressableScale style={styles.nextButton} onPress={goNext}>
           <Text style={styles.nextButtonLabel}>
             次へ{selectedFriends.length > 0 ? `（${selectedFriends.length}人選択中）` : ''}
           </Text>
-        </Pressable>
+        </PressableScale>
       </View>
     );
   }
@@ -229,22 +220,22 @@ export default function CreateGroupScreen() {
       <View style={styles.card}>
         <Text style={styles.fieldLabel}>グループの種類</Text>
         <View style={styles.segment}>
-          <Pressable
+          <PressableScale
             style={[styles.segmentBtn, groupType === 'friends' && styles.segmentBtnActive]}
             onPress={() => { setGroupType('friends'); }}
           >
             <Text style={[styles.segmentLabel, groupType === 'friends' && styles.segmentLabelActive]}>
               友人・恋人
             </Text>
-          </Pressable>
-          <Pressable
+          </PressableScale>
+          <PressableScale
             style={[styles.segmentBtn, groupType === 'family' && styles.segmentBtnActive]}
             onPress={() => { setGroupType('family'); }}
           >
             <Text style={[styles.segmentLabel, groupType === 'family' && styles.segmentLabelActive]}>
               家族
             </Text>
-          </Pressable>
+          </PressableScale>
         </View>
       </View>
 
@@ -261,7 +252,8 @@ export default function CreateGroupScreen() {
         </View>
       )}
 
-      <Pressable
+      <PressableScale
+        hapticStyle="medium"
         style={[styles.primaryButton, creating && styles.disabled]}
         disabled={creating}
         onPress={() => { void createGroup(); }}
@@ -271,7 +263,7 @@ export default function CreateGroupScreen() {
         ) : (
           <Text style={styles.primaryButtonLabel}>グループを作成する</Text>
         )}
-      </Pressable>
+      </PressableScale>
     </KeyboardAwareScrollView>
   );
 }

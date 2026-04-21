@@ -1,18 +1,11 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { PressableScale } from '../../../src/components';
 
 const immediateStops = [
   'ログイン停止',
@@ -103,7 +96,7 @@ export default function AccountDeleteScreen() {
           現在ログイン中の @{currentSession.user.userId} のセッションから、そのまま
           `DELETE /account` を実行します。
         </Text>
-        <Pressable
+        <PressableScale
           style={[styles.deleteButton, submitting && styles.buttonDisabled]}
           disabled={submitting}
           onPress={() => {
@@ -128,7 +121,7 @@ export default function AccountDeleteScreen() {
           ) : (
             <Text style={styles.deleteLabel}>退会を実行する</Text>
           )}
-        </Pressable>
+        </PressableScale>
       </View>
     </ScrollView>
   );

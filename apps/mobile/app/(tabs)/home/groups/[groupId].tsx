@@ -1,16 +1,19 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+  AnimatedCount,
+  PressableScale,
+  ReactionBurst,
+} from '../../../../src/components';
 import { toApiErrorMessage, resolveMediaUrl } from '../../../../src/lib/api';
 import { useApi } from '../../../../src/lib/use-api';
 import {
@@ -38,7 +41,7 @@ interface GroupDetailResponse {
   name: string;
   type: string;
   iconUrl: string | null;
-  members: Array<{
+  members: {
     displayName: string;
     avatarUrl: string | null;
     userId?: string;
@@ -48,7 +51,7 @@ interface GroupDetailResponse {
     moodStampId?: string | null;
     moodReactions?: MoodReactionsView | null;
     isInteractive: boolean;
-  }>;
+  }[];
 }
 
 interface DailyPromptAnswerView {
@@ -87,12 +90,94 @@ export default function GroupDetailScreen() {
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(
     null,
   );
+  const [burstTickByMoodStamp, setBurstTickByMoodStamp] = useState<
+    Record<string, { tick: number; reactionType: ReactionType }>
+  >({});
+  const [flashTickByMoodStamp, setFlashTickByMoodStamp] = useState<
+    Record<string, number>
+  >({});
+  const prevReactionTotalsRef = useRef<Record<string, number>>({});
+  const selfTriggeredBurstTickRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (session?.accessToken && groupId) {
       void loadGroup();
     }
   }, [groupId, session?.accessToken]);
+
+  const selfUserId = session?.user.userId ?? null;
+
+  const sortedMembers = useMemo(
+    () =>
+      [...(group?.members ?? [])].sort((a, b) => {
+        const priority = (member: GroupDetailResponse['members'][number]) => {
+          if (member.userId === selfUserId) {
+            return 0;
+          }
+
+          switch (member.state) {
+            case 'monitor_alert':
+              return 1;
+            case 'overdue':
+              return 2;
+            case 'pending':
+              return 3;
+            case 'checked_in':
+              return 4;
+            default:
+              return 5;
+          }
+        };
+
+        return priority(a) - priority(b);
+      }),
+    [group?.members, selfUserId],
+  );
+
+  useEffect(() => {
+    const nextReactionTotals: Record<string, number> = {};
+    const moodStampIdsToFlash: string[] = [];
+
+    for (const member of sortedMembers) {
+      if (!member.moodStampId) {
+        continue;
+      }
+
+      const moodStampId = member.moodStampId;
+      const total = member.moodReactions?.total ?? 0;
+      const previousTotal =
+        prevReactionTotalsRef.current[moodStampId] ?? total;
+
+      nextReactionTotals[moodStampId] = total;
+
+      if (total <= previousTotal) {
+        continue;
+      }
+
+      if (selfTriggeredBurstTickRef.current[moodStampId]) {
+        delete selfTriggeredBurstTickRef.current[moodStampId];
+        continue;
+      }
+
+      moodStampIdsToFlash.push(moodStampId);
+    }
+
+    prevReactionTotalsRef.current = nextReactionTotals;
+
+    if (moodStampIdsToFlash.length === 0) {
+      return;
+    }
+
+    setFlashTickByMoodStamp((currentFlashTicks) => {
+      const nextFlashTicks = { ...currentFlashTicks };
+
+      for (const moodStampId of moodStampIdsToFlash) {
+        nextFlashTicks[moodStampId] = (nextFlashTicks[moodStampId] ?? 0) + 1;
+      }
+
+      return nextFlashTicks;
+    });
+  }, [sortedMembers]);
 
   if (!session) {
     return <Redirect href={'/(auth)/login' as never} />;
@@ -103,7 +188,6 @@ export default function GroupDetailScreen() {
   }
 
   const { request } = useApi();
-  const currentSession = session;
 
   async function loadGroup() {
     try {
@@ -121,33 +205,9 @@ export default function GroupDetailScreen() {
     }
   }
 
-  const selfUserId = currentSession.user.userId;
   const selfMember = group?.members.find(
     (member) => member.userId === selfUserId,
   );
-
-  const sortedMembers = [...(group?.members ?? [])].sort((a, b) => {
-    const priority = (member: GroupDetailResponse['members'][number]) => {
-      if (member.userId === selfUserId) {
-        return 0;
-      }
-
-      switch (member.state) {
-        case 'monitor_alert':
-          return 1;
-        case 'overdue':
-          return 2;
-        case 'pending':
-          return 3;
-        case 'checked_in':
-          return 4;
-        default:
-          return 5;
-      }
-    };
-
-    return priority(a) - priority(b);
-  });
 
   const submitCheckin = async () => {
     try {
@@ -210,6 +270,21 @@ export default function GroupDetailScreen() {
           body: { reactionType },
         });
       }
+      if (currentReaction !== reactionType) {
+        setBurstTickByMoodStamp((currentBursts) => {
+          const nextTick = (currentBursts[moodStampId]?.tick ?? 0) + 1;
+
+          selfTriggeredBurstTickRef.current[moodStampId] = nextTick;
+
+          return {
+            ...currentBursts,
+            [moodStampId]: {
+              tick: nextTick,
+              reactionType,
+            },
+          };
+        });
+      }
       setReactionPickerFor(null);
       await loadGroup();
     } catch (error) {
@@ -252,7 +327,8 @@ export default function GroupDetailScreen() {
           <View style={styles.hero}>
             <Text style={styles.heroTitle}>{group.name}</Text>
             <Text style={styles.heroText}>{toGroupTypeLabel(group.type)}</Text>
-            <Pressable
+            <PressableScale
+              hapticStyle="medium"
               style={[
                 styles.primaryButton,
                 (selfMember?.state === 'checked_in' || submittingCheckin) &&
@@ -266,8 +342,9 @@ export default function GroupDetailScreen() {
               <Text style={styles.primaryButtonLabel}>
                 {selfMember?.state === 'checked_in' ? '今日反応済み' : '今日いる'}
               </Text>
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
+              hapticStyle="medium"
               style={[styles.inviteButton, generatingInvite && styles.buttonDisabled]}
               disabled={generatingInvite}
               onPress={() => { void generateInvite(); }}
@@ -277,7 +354,7 @@ export default function GroupDetailScreen() {
               ) : (
                 <Text style={styles.inviteButtonLabel}>メンバーを招待</Text>
               )}
-            </Pressable>
+            </PressableScale>
           </View>
 
           {selfMember?.state === 'checked_in' && !selfMember.mood ? (
@@ -285,7 +362,8 @@ export default function GroupDetailScreen() {
               <Text style={styles.sectionTitle}>気分スタンプ</Text>
               <View style={styles.chipWrap}>
                 {moodOptions.map((mood) => (
-                  <Pressable
+                  <PressableScale
+                    hapticStyle="medium"
                     key={mood}
                     style={[styles.chip, submittingMood && styles.buttonDisabled]}
                     disabled={submittingMood}
@@ -294,7 +372,7 @@ export default function GroupDetailScreen() {
                     }}
                   >
                     <Text style={styles.chipLabel}>{mood}</Text>
-                  </Pressable>
+                  </PressableScale>
                 ))}
               </View>
             </View>
@@ -324,16 +402,18 @@ export default function GroupDetailScreen() {
                 moodStampId !== null && reactionPickerFor === moodStampId;
               const reactionBusy =
                 moodStampId !== null && submittingReactionFor === moodStampId;
+              const flashTick =
+                moodStampId !== null ? (flashTickByMoodStamp[moodStampId] ?? 0) : 0;
+              const burst =
+                moodStampId !== null ? burstTickByMoodStamp[moodStampId] : undefined;
 
               return (
-                <View
+                <MemberCardShell
                   key={`${member.displayName}-${index}`}
-                  style={[
-                    styles.memberCard,
-                    !member.isInteractive && styles.memberCardDisabled,
-                  ]}
+                  disabled={!member.isInteractive}
+                  flashTick={flashTick}
                 >
-                  <Pressable
+                  <PressableScale
                     style={styles.memberRow}
                     disabled={!member.isInteractive}
                     onPress={() => {
@@ -384,7 +464,7 @@ export default function GroupDetailScreen() {
                         <Text style={styles.memberMeta}>参加中</Text>
                       )}
                     </View>
-                  </Pressable>
+                  </PressableScale>
 
                   {member.isInteractive &&
                   member.moodReactions &&
@@ -408,9 +488,10 @@ export default function GroupDetailScreen() {
                           member.moodReactions?.myReaction ?? null,
                         );
                       }}
+                      burst={burst}
                     />
                   ) : null}
-                </View>
+                </MemberCardShell>
               );
             })}
           </View>
@@ -453,8 +534,9 @@ function DailyPromptCard({
           const submitting = submittingChoiceKey === choice.key;
           const voters = answersByChoice.get(choice.key) ?? [];
           return (
-            <Pressable
+            <PressableScale
               key={choice.key}
+              hapticStyle="medium"
               style={[
                 styles.promptChoice,
                 selected && styles.promptChoiceSelected,
@@ -476,7 +558,7 @@ function DailyPromptCard({
                   {voters.map((v) => v.displayName).join(', ')}
                 </Text>
               ) : null}
-            </Pressable>
+            </PressableScale>
           );
         })}
       </View>
@@ -485,6 +567,10 @@ function DailyPromptCard({
 }
 
 interface ReactionBarProps {
+  burst?: {
+    tick: number;
+    reactionType: ReactionType;
+  };
   reactions: MoodReactionsView;
   canReact: boolean;
   pickerOpen: boolean;
@@ -494,6 +580,7 @@ interface ReactionBarProps {
 }
 
 function ReactionBar({
+  burst,
   reactions,
   canReact,
   pickerOpen,
@@ -501,9 +588,46 @@ function ReactionBar({
   onTogglePicker,
   onSelect,
 }: ReactionBarProps) {
+  const burstHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [visibleBurst, setVisibleBurst] = useState<
+    ReactionBarProps['burst'] | null
+  >(null);
   const counts = REACTIONS.filter(
     (r) => (reactions.byType[r.type] ?? 0) > 0,
   );
+
+  useEffect(() => {
+    if (!burst) {
+      return;
+    }
+
+    if (burstHideTimeoutRef.current) {
+      clearTimeout(burstHideTimeoutRef.current);
+    }
+
+    setVisibleBurst(burst);
+    burstHideTimeoutRef.current = setTimeout(() => {
+      setVisibleBurst((currentBurst) =>
+        currentBurst?.tick === burst.tick ? null : currentBurst,
+      );
+    }, 700);
+
+    return () => {
+      if (burstHideTimeoutRef.current) {
+        clearTimeout(burstHideTimeoutRef.current);
+      }
+    };
+  }, [burst]);
+
+  useEffect(() => {
+    return () => {
+      if (burstHideTimeoutRef.current) {
+        clearTimeout(burstHideTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showReactionPicker = canReact && (pickerOpen || visibleBurst !== null);
 
   return (
     <View style={styles.reactionBar}>
@@ -512,14 +636,16 @@ function ReactionBar({
           <Text style={styles.reactionCountsEmpty}>まだ反応なし</Text>
         ) : (
           counts.map((r) => (
-            <Text key={r.type} style={styles.reactionCountItem}>
-              {r.emoji} {reactions.byType[r.type]}
-            </Text>
+            <AnimatedCount
+              key={r.type}
+              emoji={r.emoji}
+              value={reactions.byType[r.type] ?? 0}
+            />
           ))
         )}
       </View>
       {canReact ? (
-        <Pressable
+        <PressableScale
           style={[
             styles.reactionToggle,
             reactions.myReaction && styles.reactionToggleActive,
@@ -532,33 +658,127 @@ function ReactionBar({
               ? REACTION_BY_TYPE[reactions.myReaction].emoji
               : '+ 反応'}
           </Text>
-        </Pressable>
+        </PressableScale>
       ) : null}
 
-      {canReact && pickerOpen ? (
+      {showReactionPicker ? (
         <View style={styles.reactionPicker}>
           {REACTIONS.map((r) => {
             const active = reactions.myReaction === r.type;
             return (
-              <Pressable
+              <ReactionPickerChip
                 key={r.type}
-                style={[
-                  styles.reactionPickerItem,
-                  active && styles.reactionPickerItemActive,
-                  submitting && styles.buttonDisabled,
-                ]}
+                active={active}
+                burstTick={
+                  visibleBurst?.reactionType === r.type ? visibleBurst.tick : 0
+                }
                 disabled={submitting}
+                reaction={r}
                 onPress={() => onSelect(r.type)}
-              >
-                <Text style={styles.reactionPickerEmoji}>{r.emoji}</Text>
-                <Text style={styles.reactionPickerLabel}>{r.label}</Text>
-              </Pressable>
+              />
             );
           })}
         </View>
       ) : null}
     </View>
   );
+}
+
+type ReactionPickerChipProps = {
+  active: boolean;
+  burstTick: number;
+  disabled: boolean;
+  onPress: () => void;
+  reaction: (typeof REACTIONS)[number];
+};
+
+function ReactionPickerChip({
+  active,
+  burstTick,
+  disabled,
+  onPress,
+  reaction,
+}: ReactionPickerChipProps) {
+  const previousBurstTickRef = useRef(0);
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    const previousBurstTick = previousBurstTickRef.current;
+    previousBurstTickRef.current = burstTick;
+
+    if (burstTick === 0 || burstTick === previousBurstTick) {
+      return;
+    }
+
+    scale.value = withSequence(
+      withTiming(1.3, {
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+      }),
+      withTiming(1, {
+        duration: 180,
+        easing: Easing.inOut(Easing.quad),
+      }),
+    );
+  }, [burstTick, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <View style={styles.reactionPickerItem}>
+      <PressableScale
+        disabled={disabled}
+        hapticStyle="light"
+        onPress={onPress}
+        style={[
+          styles.reactionPickerItemButton,
+          active && styles.reactionPickerItemActive,
+          disabled && styles.buttonDisabled,
+        ]}
+      >
+        <Animated.View style={[styles.reactionPickerItemInner, animatedStyle]}>
+          <Text style={styles.reactionPickerEmoji}>{reaction.emoji}</Text>
+          <Text style={styles.reactionPickerLabel}>{reaction.label}</Text>
+        </Animated.View>
+      </PressableScale>
+      {burstTick > 0 ? <ReactionBurst emoji={reaction.emoji} trigger={burstTick} /> : null}
+    </View>
+  );
+}
+
+interface MemberCardShellProps {
+  children: ReactNode;
+  disabled: boolean;
+  flashTick: number;
+}
+
+function MemberCardShell({
+  children,
+  disabled,
+  flashTick,
+}: MemberCardShellProps) {
+  const bgProgress = useSharedValue(0);
+
+  useEffect(() => {
+    if (flashTick === 0) {
+      return;
+    }
+
+    bgProgress.value = 1;
+    bgProgress.value = withTiming(0, { duration: 400 });
+  }, [bgProgress, flashTick]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      bgProgress.value,
+      [0, 1],
+      [disabled ? '#f7f3ea' : '#fcfaf4', colors.accentTint],
+    ),
+  }));
+
+  return <Animated.View style={[styles.memberCard, animatedStyle]}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({
@@ -641,16 +861,12 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: '#fcfaf4',
     borderWidth: 1,
     borderColor: '#e1dacd',
   },
   memberRow: {
     flexDirection: 'row',
     gap: 12,
-  },
-  memberCardDisabled: {
-    backgroundColor: '#f7f3ea',
   },
   avatar: {
     width: 44,
@@ -732,10 +948,6 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
   },
-  reactionCountItem: {
-    fontSize: 13,
-    color: colors.ink,
-  },
   reactionCountsEmpty: {
     fontSize: 12,
     color: colors.hint,
@@ -765,6 +977,10 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   reactionPickerItem: {
+    overflow: 'visible',
+    position: 'relative',
+  },
+  reactionPickerItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -774,6 +990,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.nestedSurface,
     borderWidth: 1,
     borderColor: colors.nestedBorder,
+  },
+  reactionPickerItemInner: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
   },
   reactionPickerItemActive: {
     backgroundColor: colors.accentSoft,

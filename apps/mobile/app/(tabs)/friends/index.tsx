@@ -1,23 +1,13 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  RefreshControl,
-  Share,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Image, RefreshControl, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CheckinPulseDot, Mascot, ScreenHeader, TodayHereBadge, PressableScale } from '../../../src/components';
 import { resolveMediaUrl, toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { formatDateTime } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
-import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
+import { colors, spacing, typography } from '../../../src/ui/theme';
 
 interface FriendSummary {
   friendshipId: string;
@@ -226,16 +216,17 @@ export default function FriendsTabScreen() {
   return (
     <KeyboardAwareScrollView
       outerStyle={styles.screen}
-        contentContainerStyle={styles.container}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void loadFriendsTab(true)}
-            tintColor={colors.accent}
-          />
-        }
-      >
-        <View style={styles.card}>
+      contentContainerStyle={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void loadFriendsTab(true)}
+          tintColor={colors.accent}
+        />
+      }
+    >
+      <ScreenHeader title="ともだち" />
+      <View style={styles.card}>
           <Text style={styles.sectionTitle}>招待リンク</Text>
           <Text style={styles.metaText}>
             リンクを送ると、相手が承認したところでフレンドになれます。
@@ -248,37 +239,38 @@ export default function FriendsTabScreen() {
                 </Text>
               </View>
               <View style={styles.actionRow}>
-                <Pressable
+                <PressableScale
                   style={styles.primaryButton}
                   onPress={() => { void Share.share({ message: inviteLink.shareText }); }}
                 >
                   <Text style={styles.primaryButtonLabel}>リンクを共有</Text>
-                </Pressable>
-                <Pressable
+                </PressableScale>
+                <PressableScale
                   style={styles.secondaryButton}
                   onPress={() => { void Share.share({ message: inviteLink.inviteUrl }); }}
                 >
                   <Text style={styles.secondaryButtonLabel}>コピー</Text>
-                </Pressable>
+                </PressableScale>
               </View>
               <View style={styles.actionRow}>
-                <Pressable
+                <PressableScale
                   style={[styles.secondaryButton, preparingInvite && styles.buttonDisabled]}
                   disabled={preparingInvite}
                   onPress={() => { void prepareInvite(true); }}
                 >
                   <Text style={styles.secondaryButtonLabel}>再発行</Text>
-                </Pressable>
-                <Pressable
+                </PressableScale>
+                <PressableScale
                   style={styles.secondaryButton}
                   onPress={() => { setInviteLink(null); }}
                 >
                   <Text style={styles.secondaryButtonLabel}>閉じる</Text>
-                </Pressable>
+                </PressableScale>
               </View>
             </>
           ) : (
-            <Pressable
+            <PressableScale
+              hapticStyle="medium"
               style={[styles.primaryButton, preparingInvite && styles.buttonDisabled]}
               disabled={preparingInvite}
               onPress={() => { void prepareInvite(false); }}
@@ -288,7 +280,7 @@ export default function FriendsTabScreen() {
               ) : (
                 <Text style={styles.primaryButtonLabel}>招待リンクを作成</Text>
               )}
-            </Pressable>
+            </PressableScale>
           )}
         </View>
 
@@ -305,7 +297,7 @@ export default function FriendsTabScreen() {
             autoCorrect={false}
             style={styles.input}
           />
-          <Pressable
+          <PressableScale
             style={[styles.primaryButton, searching && styles.buttonDisabled]}
             disabled={searching}
             onPress={() => {
@@ -313,7 +305,7 @@ export default function FriendsTabScreen() {
             }}
           >
             <Text style={styles.primaryButtonLabel}>検索する</Text>
-          </Pressable>
+          </PressableScale>
           {searching ? <ActivityIndicator color={colors.accent} /> : null}
           {searchResults.map((result) => {
             const isFriend = friends.some((f) => f.friend.userId === result.userId);
@@ -341,27 +333,36 @@ export default function FriendsTabScreen() {
                     <Text style={styles.statusBadgeText}>申請済み</Text>
                   </View>
                 ) : (
-                  <Pressable
+                  <PressableScale
+                    hapticStyle="medium"
                     style={styles.secondaryButton}
                     onPress={() => { void sendRequest(result.userId); }}
                   >
                     <Text style={styles.secondaryButtonLabel}>友達申請を送る</Text>
-                  </Pressable>
+                  </PressableScale>
                 )}
               </View>
             );
           })}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>友達一覧</Text>
-          {loading ? (
-            <ActivityIndicator color={colors.accent} />
-          ) : friends.length === 0 ? (
-            <Text style={styles.metaText}>まだ友達は追加されていません。</Text>
-          ) : (
-            friends.map((item) => (
-              <Pressable
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>友達一覧</Text>
+        {loading ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : friends.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Mascot size={120} variant="wave" />
+            <Text style={styles.emptyStateText}>
+              ともだちを招待して、今日いる を届けよう
+            </Text>
+          </View>
+        ) : (
+          friends.map((item) => {
+            const checkedInToday = !!item.latestCheckinAt;
+
+            return (
+              <PressableScale
                 key={item.friendshipId}
                 style={styles.listCard}
                 onPress={() => {
@@ -374,22 +375,36 @@ export default function FriendsTabScreen() {
                 }}
               >
                 <View style={styles.memberRow}>
-                  <Avatar url={item.friend.avatarUrl} name={item.friend.displayName || item.friend.userId} />
+                  <View style={styles.avatarWrapper}>
+                    <Avatar
+                      url={item.friend.avatarUrl}
+                      name={item.friend.displayName || item.friend.userId}
+                    />
+                    {checkedInToday ? (
+                      <View pointerEvents="none" style={styles.pulseAnchor}>
+                        <CheckinPulseDot />
+                      </View>
+                    ) : null}
+                  </View>
                   <View style={styles.memberBody}>
-                    <Text style={styles.listTitle}>{item.friend.displayName}</Text>
-                    <Text style={styles.memberStatus}>
-                      {item.latestCheckinAt ? '今日反応済み' : 'まだ未反応'}
-                    </Text>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.listTitle}>{item.friend.displayName}</Text>
+                      {checkedInToday ? <TodayHereBadge /> : null}
+                    </View>
+                    {!checkedInToday ? (
+                      <Text style={styles.memberStatus}>まだ未反応</Text>
+                    ) : null}
                     <Text style={styles.memberMetaLine}>
                       {formatFriendActivity(item)}
                       {item.latestMood ? ` ／ 気分: ${item.latestMood}` : ''}
                     </Text>
                   </View>
                 </View>
-              </Pressable>
-            ))
-          )}
-        </View>
+              </PressableScale>
+            );
+          })
+        )}
+      </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>受信した申請</Text>
@@ -405,22 +420,23 @@ export default function FriendsTabScreen() {
                   @{request.from.userId} ／ {formatDateTime(request.createdAt)}
                 </Text>
                 <View style={styles.actionRow}>
-                  <Pressable
+                  <PressableScale
+                    hapticStyle="medium"
                     style={styles.primaryButton}
                     onPress={() => {
                       void acceptRequest(request.requestId);
                     }}
                   >
                     <Text style={styles.primaryButtonLabel}>承認</Text>
-                  </Pressable>
-                  <Pressable
+                  </PressableScale>
+                  <PressableScale
                     style={styles.secondaryButton}
                     onPress={() => {
                       void rejectRequest(request.requestId);
                     }}
                   >
                     <Text style={styles.secondaryButtonLabel}>拒否</Text>
-                  </Pressable>
+                  </PressableScale>
                 </View>
               </View>
             ))
@@ -436,14 +452,14 @@ export default function FriendsTabScreen() {
                 <Text style={styles.pendingMetaText}>
                   @{request.to.userId} ／ {formatDateTime(request.createdAt)} に送信
                 </Text>
-                <Pressable
+                <PressableScale
                   style={styles.secondaryButton}
                   onPress={() => {
                     void cancelRequest(request.requestId);
                   }}
                 >
                   <Text style={styles.secondaryButtonLabel}>取消</Text>
-                </Pressable>
+                </PressableScale>
               </View>
             ))}
           </View>
@@ -461,6 +477,16 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 16,
     backgroundColor: colors.pageBg,
+  },
+  emptyState: {
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingVertical: spacing['3xl'],
+  },
+  emptyStateText: {
+    ...typography.body,
+    color: colors.muted,
+    textAlign: 'center',
   },
   hero: {
     padding: 22,
@@ -506,6 +532,14 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'center',
   },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  pulseAnchor: {
+    bottom: -2,
+    position: 'absolute',
+    right: -2,
+  },
   avatar: {
     width: 44,
     height: 44,
@@ -522,6 +556,12 @@ const styles = StyleSheet.create({
   memberBody: {
     flex: 1,
     gap: 2,
+  },
+  nameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   memberStatus: {
     fontSize: 13,

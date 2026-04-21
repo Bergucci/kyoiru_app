@@ -1,34 +1,21 @@
 import { Redirect, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Mascot, MonitoringMetaChip, MonitoringStageBadge, ScreenHeader, resolveMonitoringStageTone, PressableScale } from '../../../src/components';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import {
   formatDateTime,
+  formatRelativeMinutes,
+  toCheckinTemplateLabel,
   toEntitlementLabel,
   toMonitoringRoleLabel,
-  toMonitoringStageLabel,
   toMonitoringStatusLabel,
 } from '../../../src/lib/format';
+import { useEntitlement } from '../../../src/session/entitlement-context';
 import { useSession } from '../../../src/session/session-context';
-import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
-
-interface EntitlementResponse {
-  planName: string;
-  status: string;
-  currentPeriodExpiresAt: string | null;
-  gracePeriodExpiresAt: string | null;
-  isActiveForFeatures: boolean;
-}
+import { colors, spacing, typography } from '../../../src/ui/theme';
 
 interface SubscriptionCopy {
   planName: string;
@@ -95,7 +82,7 @@ const planHighlights = [
 export default function MonitoringTabScreen() {
   const router = useRouter();
   const { session } = useSession();
-  const [entitlement, setEntitlement] = useState<EntitlementResponse | null>(null);
+  const { entitlement, loading: entitlementLoading } = useEntitlement();
   const [subscriptionCopy, setSubscriptionCopy] = useState<SubscriptionCopy | null>(
     null,
   );
@@ -115,12 +102,26 @@ export default function MonitoringTabScreen() {
   const [contactCache, setContactCache] = useState<
     Record<string, FinalStageEmergencyContact | undefined>
   >({});
+  const sortedDashboard = useMemo(() => {
+    const priority = {
+      alert: 0,
+      warn: 1,
+      caution: 2,
+      calm: 3,
+    } as const;
+
+    return [...dashboard].sort(
+      (a, b) =>
+        priority[resolveMonitoringStageTone(a.currentStage)] -
+        priority[resolveMonitoringStageTone(b.currentStage)],
+    );
+  }, [dashboard]);
 
   useEffect(() => {
-    if (session?.accessToken) {
+    if (session?.accessToken && !entitlementLoading) {
       void loadMonitoring();
     }
-  }, [session?.accessToken]);
+  }, [entitlement?.isActiveForFeatures, entitlementLoading, session?.accessToken]);
 
   if (!session) {
     return <Redirect href={'/(auth)/login' as never} />;
@@ -135,15 +136,10 @@ export default function MonitoringTabScreen() {
   async function loadMonitoring() {
     try {
       setLoading(true);
-      const [entitlementResponse, copyResponse] = await Promise.all([
-        request<EntitlementResponse>('/billing/entitlement', {}),
-        apiRequest<SubscriptionCopy>('/billing/subscription-copy'),
-      ]);
-
-      setEntitlement(entitlementResponse);
+      const copyResponse = await apiRequest<SubscriptionCopy>('/billing/subscription-copy');
       setSubscriptionCopy(copyResponse);
 
-      if (!entitlementResponse.isActiveForFeatures) {
+      if (!entitlement?.isActiveForFeatures) {
         setDashboard([]);
         setRelationships([]);
         setIncomingRequests([]);
@@ -226,11 +222,14 @@ export default function MonitoringTabScreen() {
     }
   };
 
-  if (loading && !entitlement) {
+  if ((loading || entitlementLoading) && !entitlement && !subscriptionCopy) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
+      <KeyboardAwareScrollView contentContainerStyle={styles.container}>
+        <ScreenHeader title="みまもり" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      </KeyboardAwareScrollView>
     );
   }
 
@@ -239,6 +238,7 @@ export default function MonitoringTabScreen() {
   if (!isPaid) {
     return (
       <KeyboardAwareScrollView contentContainerStyle={styles.container}>
+        <ScreenHeader title="みまもり" />
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>大切な人を、もう少しちゃんと見守る。</Text>
           <Text style={styles.heroText}>
@@ -267,14 +267,15 @@ export default function MonitoringTabScreen() {
               </View>
             ))}
           </View>
-          <Pressable
+          <PressableScale
+            hapticStyle="medium"
             style={styles.primaryButton}
             onPress={() => {
               router.push('/(tabs)/settings/subscription-info' as never);
             }}
           >
             <Text style={styles.primaryButtonLabel}>7 日間無料で試す</Text>
-          </Pressable>
+          </PressableScale>
           <Text style={styles.paywallFinePrint}>
             監視ではなく、反応がない時に気づきやすくするための機能です。
           </Text>
@@ -289,6 +290,7 @@ export default function MonitoringTabScreen() {
 
   return (
     <KeyboardAwareScrollView contentContainerStyle={styles.container}>
+      <ScreenHeader title="みまもり" />
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>見守り</Text>
         <Text style={styles.heroText}>
@@ -322,31 +324,51 @@ export default function MonitoringTabScreen() {
         <Text style={styles.sectionTitle}>見守りダッシュボード</Text>
         {loading ? (
           <ActivityIndicator color={colors.accent} />
-        ) : dashboard.length === 0 ? (
-          <Text style={styles.metaText}>見守り対象はまだありません。</Text>
+        ) : sortedDashboard.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Mascot size={120} variant="sleepy" />
+            <Text style={styles.emptyStateText}>まだ見守り対象はいません</Text>
+          </View>
         ) : (
-          dashboard.map((item) => (
+          sortedDashboard.map((item) => (
             <View key={item.relationshipId} style={styles.listCard}>
-              <Text style={styles.statusText}>{item.target.displayName}</Text>
+              <View style={styles.rowHeader}>
+                <Text style={styles.statusText}>{item.target.displayName}</Text>
+                <MonitoringStageBadge stage={item.currentStage} />
+              </View>
               <Text style={styles.metaText}>@{item.target.userId}</Text>
-              <Text style={styles.metaText}>
-                ステージ: {toMonitoringStageLabel(item.currentStage)}
-              </Text>
-              <Text style={styles.metaText}>
-                最終反応: {formatDateTime(item.lastCheckedInAt)}
-              </Text>
-              <Text style={styles.metaText}>
-                GPS 導線: {item.canOpenLocationCheck ? '表示可' : 'まだ表示しない'}
-              </Text>
+              <View style={styles.chipsRow}>
+                <MonitoringMetaChip
+                  icon="⏱"
+                  label={formatRelativeMinutes(item.lastCheckedInAt)}
+                  tone={
+                    item.currentStage === 'monitor_stage_3' ? 'muted' : 'positive'
+                  }
+                />
+                <MonitoringMetaChip
+                  icon="📍"
+                  label={item.canOpenLocationCheck ? 'GPS 表示可' : 'GPS まだ'}
+                  tone={item.canOpenLocationCheck ? 'positive' : 'muted'}
+                />
+                <MonitoringMetaChip
+                  icon="☎️"
+                  label={item.hasEmergencyContact ? '緊急連絡先あり' : '緊急連絡先なし'}
+                  tone={item.hasEmergencyContact ? 'positive' : 'muted'}
+                />
+                <MonitoringMetaChip
+                  icon="📅"
+                  label={toCheckinTemplateLabel(item.checkinTemplate)}
+                />
+              </View>
               {item.currentStage === 'monitor_stage_3' && item.hasEmergencyContact ? (
-                <Pressable
+                <PressableScale
                   style={styles.primaryButton}
                   onPress={() => {
                     void openFinalStageContact(item.relationshipId);
                   }}
                 >
                   <Text style={styles.primaryButtonLabel}>最終段階の連絡先を確認</Text>
-                </Pressable>
+                </PressableScale>
               ) : null}
               {contactCache[item.relationshipId] ? (
                 <View style={styles.contactCard}>
@@ -378,7 +400,7 @@ export default function MonitoringTabScreen() {
           <Text style={styles.metaText}>見守り関係はまだありません。</Text>
         ) : (
           actionableRelationships.map((item) => (
-            <Pressable
+            <PressableScale
               key={item.id}
               style={styles.listCard}
               onPress={() => {
@@ -400,7 +422,7 @@ export default function MonitoringTabScreen() {
                 開始日時: {formatDateTime(item.activatedAt ?? item.requestedAt)}
               </Text>
               <Text style={styles.detailText}>詳細を開く</Text>
-            </Pressable>
+            </PressableScale>
           ))
         )}
       </View>
@@ -420,22 +442,23 @@ export default function MonitoringTabScreen() {
                 受信日時: {formatDateTime(item.requestedAt)}
               </Text>
               <View style={styles.actionRow}>
-                <Pressable
+                <PressableScale
+                  hapticStyle="medium"
                   style={styles.primaryButton}
                   onPress={() => {
                     void runPendingAction(item.id, 'approve');
                   }}
                 >
                   <Text style={styles.primaryButtonLabel}>承認</Text>
-                </Pressable>
-                <Pressable
+                </PressableScale>
+                <PressableScale
                   style={styles.secondaryButton}
                   onPress={() => {
                     void runPendingAction(item.id, 'reject');
                   }}
                 >
                   <Text style={styles.secondaryButtonLabel}>拒否</Text>
-                </Pressable>
+                </PressableScale>
               </View>
             </View>
           ))
@@ -456,14 +479,14 @@ export default function MonitoringTabScreen() {
               <Text style={styles.metaText}>
                 送信日時: {formatDateTime(item.requestedAt)}
               </Text>
-              <Pressable
+              <PressableScale
                 style={styles.secondaryButton}
                 onPress={() => {
                   void runPendingAction(item.id, 'cancel');
                 }}
               >
                 <Text style={styles.secondaryButtonLabel}>取消</Text>
-              </Pressable>
+              </PressableScale>
             </View>
           ))
         )}
@@ -482,7 +505,8 @@ export default function MonitoringTabScreen() {
           autoCorrect={false}
           style={styles.input}
         />
-        <Pressable
+        <PressableScale
+          hapticStyle="medium"
           style={[styles.primaryButton, requesting && styles.buttonDisabled]}
           disabled={requesting}
           onPress={() => {
@@ -490,7 +514,7 @@ export default function MonitoringTabScreen() {
           }}
         >
           <Text style={styles.primaryButtonLabel}>見守り開始を送る</Text>
-        </Pressable>
+        </PressableScale>
       </View>
     </KeyboardAwareScrollView>
   );
@@ -501,6 +525,16 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 16,
     backgroundColor: colors.pageBg,
+  },
+  emptyState: {
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingVertical: spacing['3xl'],
+  },
+  emptyStateText: {
+    ...typography.body,
+    color: colors.muted,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -594,6 +628,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.nestedSurface,
     borderWidth: 1,
     borderColor: colors.nestedBorder,
+    gap: 6,
+  },
+  rowHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
   },
   actionRow: {

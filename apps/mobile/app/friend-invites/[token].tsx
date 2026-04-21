@@ -1,17 +1,10 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiRequest, toApiErrorMessage } from '../../src/lib/api';
 import { useSession } from '../../src/session/session-context';
 import { colors } from '../../src/ui/theme';
+import { PressableScale } from '../../src/components';
 
 interface FriendInvitePreview {
   inviter: {
@@ -80,14 +73,14 @@ export default function FriendInviteScreen() {
           <Text style={styles.body}>
             このリンクを使うにはログイン済みセッションが必要です。ログイン後に再度このリンクを開いてください。
           </Text>
-          <Pressable
+          <PressableScale
             style={styles.primaryButton}
             onPress={() => {
               router.replace('/(auth)/login' as never);
             }}
           >
             <Text style={styles.primaryButtonLabel}>ログイン画面へ</Text>
-          </Pressable>
+          </PressableScale>
         </View>
       </ScrollView>
     );
@@ -112,7 +105,8 @@ export default function FriendInviteScreen() {
                 ? 'このリンクから友達追加できます。'
                 : 'このリンクは現在利用できません。'}
             </Text>
-            <Pressable
+            <PressableScale
+              hapticStyle="medium"
               style={[
                 styles.primaryButton,
                 (!preview.joinable || accepting) && styles.buttonDisabled,
@@ -123,7 +117,7 @@ export default function FriendInviteScreen() {
               }}
             >
               <Text style={styles.primaryButtonLabel}>友達になる</Text>
-            </Pressable>
+            </PressableScale>
           </>
         ) : null}
       </View>

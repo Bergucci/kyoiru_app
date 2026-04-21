@@ -1,14 +1,6 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
 import {
   formatDateTime,
@@ -17,6 +9,7 @@ import {
 } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
+import { PressableScale } from '../../../src/components';
 
 interface AccountSettingsResponse {
   userId: string;
@@ -110,14 +103,14 @@ export default function AccountSettingsScreen() {
             <Text style={styles.body}>
               次回変更可能日: {formatDateTime(settings.nextUserIdChangeAvailableAt)}
             </Text>
-            <Pressable
+            <PressableScale
               style={styles.secondaryButton}
               onPress={() => {
                 router.push('/(tabs)/settings/user-id' as never);
               }}
             >
               <Text style={styles.secondaryButtonLabel}>ID変更へ進む</Text>
-            </Pressable>
+            </PressableScale>
           </View>
 
           <View style={styles.card}>
@@ -127,7 +120,7 @@ export default function AccountSettingsScreen() {
                 { value: 'public', label: 'ON' },
                 { value: 'private', label: 'OFF' },
               ] as const).map((item) => (
-                <Pressable
+                <PressableScale
                   key={item.value}
                   style={[
                     styles.segmentButton,
@@ -145,10 +138,11 @@ export default function AccountSettingsScreen() {
                   >
                     {item.label}
                   </Text>
-                </Pressable>
+                </PressableScale>
               ))}
             </View>
-            <Pressable
+            <PressableScale
+              hapticStyle="medium"
               style={[styles.primaryButton, saving && styles.buttonDisabled]}
               disabled={saving}
               onPress={() => {
@@ -156,7 +150,7 @@ export default function AccountSettingsScreen() {
               }}
             >
               <Text style={styles.primaryButtonLabel}>公開設定を保存</Text>
-            </Pressable>
+            </PressableScale>
           </View>
 
           <View style={styles.card}>

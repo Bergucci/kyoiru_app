@@ -1,20 +1,13 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { formatDateTime } from '../../../src/lib/format';
 import { useSession } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
+import { PressableScale } from '../../../src/components';
 
 interface AccountSettingsResponse {
   userId: string;
@@ -115,7 +108,8 @@ export default function UserIdSettingsScreen() {
             autoCorrect={false}
             style={styles.input}
           />
-          <Pressable
+          <PressableScale
+            hapticStyle="medium"
             style={[styles.primaryButton, saving && styles.buttonDisabled]}
             disabled={saving}
             onPress={() => {
@@ -123,7 +117,7 @@ export default function UserIdSettingsScreen() {
             }}
           >
             <Text style={styles.primaryButtonLabel}>IDを更新する</Text>
-          </Pressable>
+          </PressableScale>
         </View>
       )}
     </KeyboardAwareScrollView>

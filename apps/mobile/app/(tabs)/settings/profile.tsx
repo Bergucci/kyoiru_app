@@ -1,22 +1,14 @@
 import { Redirect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getApiUrl, resolveMediaUrl, toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
 import { useSession, type SessionUser } from '../../../src/session/session-context';
 import { colors } from '../../../src/ui/theme';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
+import { PressableScale } from '../../../src/components';
 
 export default function ProfileSettingsScreen() {
   const router = useRouter();
@@ -118,7 +110,7 @@ export default function ProfileSettingsScreen() {
 
       <View style={styles.card}>
         <View style={styles.avatarSection}>
-          <Pressable style={styles.avatarWrapper} onPress={() => { void pickAvatar(); }}>
+          <PressableScale style={styles.avatarWrapper} onPress={() => { void pickAvatar(); }}>
             {displayAvatar ? (
               <Image source={{ uri: displayAvatar }} style={styles.avatarImage} />
             ) : (
@@ -131,7 +123,7 @@ export default function ProfileSettingsScreen() {
             <View style={styles.avatarBadge}>
               <Ionicons name="camera" size={14} color="#ffffff" />
             </View>
-          </Pressable>
+          </PressableScale>
           <Text style={styles.avatarHint}>タップして変更</Text>
         </View>
 
@@ -146,7 +138,8 @@ export default function ProfileSettingsScreen() {
           />
         </View>
 
-        <Pressable
+        <PressableScale
+          hapticStyle="medium"
           style={[styles.primaryButton, saving && styles.buttonDisabled]}
           disabled={saving}
           onPress={() => { void saveProfile(); }}
@@ -156,11 +149,11 @@ export default function ProfileSettingsScreen() {
           ) : (
             <Text style={styles.primaryButtonLabel}>保存する</Text>
           )}
-        </Pressable>
+        </PressableScale>
       </View>
 
       <View style={styles.menuCard}>
-        <Pressable
+        <PressableScale
           style={styles.menuRow}
           onPress={() => { router.push('/(tabs)/settings/user-id' as never); }}
         >
@@ -169,7 +162,7 @@ export default function ProfileSettingsScreen() {
             <Text style={styles.menuMeta}>@{currentSession.user.userId}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.hint} />
           </View>
-        </Pressable>
+        </PressableScale>
       </View>
     </KeyboardAwareScrollView>
   );
