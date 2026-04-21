@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   Share,
@@ -10,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { toApiErrorMessage } from '../../../../src/lib/api';
+import { toApiErrorMessage, resolveMediaUrl } from '../../../../src/lib/api';
 import { useApi } from '../../../../src/lib/use-api';
 import {
   formatDateTime,
@@ -354,9 +355,16 @@ export default function GroupDetailScreen() {
                     }}
                   >
                     <View style={styles.avatar}>
-                      <Text style={styles.avatarLabel}>
-                        {member.displayName.slice(0, 1)}
-                      </Text>
+                      {resolveMediaUrl(member.avatarUrl) ? (
+                        <Image
+                          source={{ uri: resolveMediaUrl(member.avatarUrl) }}
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.avatarLabel}>
+                          {member.displayName.slice(0, 1)}
+                        </Text>
+                      )}
                     </View>
                     <View style={styles.memberBody}>
                       <Text style={styles.memberName}>{member.displayName}</Text>
@@ -651,6 +659,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#dce7de',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   avatarLabel: {
     fontSize: 18,

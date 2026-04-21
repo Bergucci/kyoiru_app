@@ -24,7 +24,6 @@ import {
   useSocialLoginController,
   type SocialProvider,
 } from '../../src/lib/social-login';
-import { ApiError } from '../../src/lib/api';
 import { useSession, type SessionState } from '../../src/session/session-context';
 import { colors } from '../../src/ui/theme';
 
@@ -133,10 +132,6 @@ export default function LoginScreen() {
       if (error instanceof SocialLoginUnavailableError) {
         Alert.alert(`${socialProviders[provider].label} ログイン`, error.message);
         return;
-      }
-      // [LINE DEBUG] API エラーの生 body を出力して 400 の原因を特定する
-      if (provider === 'line' && error instanceof ApiError) {
-        console.log('[LINE] ApiError status:', error.status, '| body:', JSON.stringify(error.body));
       }
       Alert.alert(
         `${socialProviders[provider].label} ログインに失敗しました`,

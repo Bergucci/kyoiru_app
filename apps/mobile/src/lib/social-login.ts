@@ -13,13 +13,13 @@ export type SocialProvider = 'apple' | 'google' | 'line';
 
 interface SocialProviderMeta {
   label: string;
-  credentialField: 'identityToken' | 'idToken' | 'accessToken';
+  credentialField: 'identityToken' | 'idToken';
 }
 
 export const socialProviders: Record<SocialProvider, SocialProviderMeta> = {
   apple: { label: 'Apple', credentialField: 'identityToken' },
   google: { label: 'Google', credentialField: 'idToken' },
-  line: { label: 'LINE', credentialField: 'accessToken' },
+  line: { label: 'LINE', credentialField: 'idToken' },
 };
 
 export class SocialLoginUnavailableError extends Error {
@@ -185,36 +185,18 @@ export function useSocialLoginController(): SocialLoginController {
       );
     }
 
-    // [LINE DEBUG] channel ID の設定確認
-    console.log('[LINE] setup channelId length:', lineChannelId.length, '| prefix:', lineChannelId.slice(0, 4));
-
     await LineLogin.setup({ channelId: lineChannelId });
 
     try {
       const result = await LineLogin.login({ scopes: [Scope.Profile, Scope.OpenId] });
 
-      // [LINE DEBUG] SDK から返ってきた result 全体の key 一覧
-      console.log('[LINE] login result keys:', Object.keys(result));
-      console.log('[LINE] accessToken object keys:', Object.keys(result.accessToken));
-
-      const accessToken = result.accessToken.accessToken;
-
-      // [LINE DEBUG] token の存在と内容を確認（全文は出さない）
-      console.log('[LINE] accessToken type:', typeof accessToken);
-      console.log('[LINE] accessToken length:', accessToken?.length ?? 'undefined');
-      console.log('[LINE] accessToken prefix:', typeof accessToken === 'string' ? accessToken.slice(0, 8) : 'N/A');
-
-      if (!accessToken) {
-        throw new Error('LINE accessToken を取得できませんでした。');
+      const idToken = result.accessToken.idToken;
+      if (!idToken) {
+        throw new Error('LINE idToken を取得できませんでした。');
       }
 
-      // [LINE DEBUG] backend に送る payload を確認
-      console.log('[LINE] sending to /auth/line, body key: accessToken, length:', accessToken.length);
-
-      return exchangeCredential('line', accessToken);
+      return exchangeCredential('line', idToken);
     } catch (error) {
-      // [LINE DEBUG] SDK / API エラーの全詳細
-      console.log('[LINE] error caught:', JSON.stringify(error, Object.getOwnPropertyNames(error as object)));
       if (isLineCancelError(error)) {
         throw new SocialLoginCancelledError('line');
       }
