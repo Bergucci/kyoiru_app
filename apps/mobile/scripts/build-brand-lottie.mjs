@@ -73,6 +73,16 @@ const diamondShape = (cx, cy, r) =>
     true
   );
 
+const starShape = (cx, cy, outerR, innerR, points = 5) => {
+  const verts = [];
+  for (let i = 0; i < points * 2; i++) {
+    const angle = -Math.PI / 2 + (i * Math.PI) / points;
+    const radius = i % 2 === 0 ? outerR : innerR;
+    verts.push({ x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius });
+  }
+  return pathShape(verts, true);
+};
+
 // Build a closed path from an array of vertex objects {x,y, iX,iY, oX,oY} (tangents absolute; converted to relative here)
 const pathShape = (verts, closed = true) => {
   const v = verts.map((p) => [p.x, p.y]);
@@ -153,51 +163,54 @@ const mulberry32 = (seed) => {
 // ---- Confetti ----
 const buildConfetti = () => {
   const W = 390;
-  const H = 200;
+  const H = 844;
   const FR = 30;
-  const DUR = 42; // 1.4s
+  const DUR = 54; // 1.8s
   const rng = mulberry32(20260422);
-  const colors = ['#EE8A57', '#15695C', '#34C759', '#FFF1DB'];
+  const colors = ['#EE8A57', '#FFE6C9', '#1F5A4A', '#34C759', '#E6F7EB', '#3A2E24'];
   const N = 24;
 
   const layers = [];
   for (let k = 0; k < N; k++) {
     const color = colors[k % colors.length];
     const startX = rng() * W;
-    const midX = startX + (rng() - 0.5) * 54;
-    const endX = startX + (rng() - 0.5) * 92;
-    const startFrame = Math.floor(rng() * 12);
-    const midFrame = startFrame + 16 + Math.floor(rng() * 6);
-    const rotMid = (rng() < 0.5 ? -1 : 1) * (120 + rng() * 160);
-    const rotEnd = rotMid + (rng() < 0.5 ? -1 : 1) * (180 + rng() * 280);
+    const midX = startX + (rng() - 0.5) * 96;
+    const endX = startX + (rng() - 0.5) * 156;
+    const startFrame = Math.floor(rng() * 10);
+    const driftFrame = startFrame + 20 + Math.floor(rng() * 7);
+    const endFrame = DUR;
+    const rotMid = (rng() < 0.5 ? -1 : 1) * (140 + rng() * 220);
+    const rotEnd = rotMid + (rng() < 0.5 ? -1 : 1) * (220 + rng() * 360);
     const size = 5 + Math.floor(rng() * 7);
-    const opacity = 58 + Math.floor(rng() * 34);
-    const type = k % 4;
+    const opacity = 56 + Math.floor(rng() * 32);
+    const type = k % 5;
     const shapeItem =
       type === 0
-        ? rectShape(-size / 2, -size, size, size * 1.8, 1.4)
+        ? rectShape(-size / 2, -size * 1.4, size, size * 2.8, 1.8)
         : type === 1
-          ? ellipseShape(0, 0, size * 0.55, size * 0.55)
-          : type === 2
-            ? diamondShape(0, 0, size * 0.78)
-            : rectShape(-size / 2.6, -size * 1.35, size / 1.3, size * 2.7, size * 0.3);
+          ? ellipseShape(0, 0, size * 0.64, size * 0.64)
+        : type === 2
+          ? diamondShape(0, 0, size * 0.86)
+          : type === 3
+            ? starShape(0, 0, size * 1.05, size * 0.46, 5)
+            : rectShape(-size / 3, -size * 1.1, size * 0.66, size * 2.2, size * 0.3);
     const shapes = [group(`conf-${k}`, [shapeItem, fl(color, opacity)])];
     const transform = {
       ind: k + 1,
       p: {
         a: 1,
         k: [
-          { t: startFrame, s: [startX, -32, 0], i: { x: [0.16], y: [1] }, o: { x: [0.4], y: [0] } },
-          { t: midFrame, s: [midX, 86 + rng() * 28, 0], i: { x: [0.2], y: [1] }, o: { x: [0.4], y: [0] } },
-          { t: DUR, s: [endX, H + 26, 0] },
+          { t: startFrame, s: [startX, -36 - rng() * 40, 0], i: { x: [0.18], y: [1] }, o: { x: [0.42], y: [0] } },
+          { t: driftFrame, s: [midX, 260 + rng() * 180, 0], i: { x: [0.22], y: [1] }, o: { x: [0.38], y: [0] } },
+          { t: endFrame, s: [endX, H + 36 + rng() * 60, 0] },
         ],
       },
       r: {
         a: 1,
         k: [
           { t: startFrame, s: [0], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
-          { t: midFrame, s: [rotMid], i: { x: [0.3], y: [1] }, o: { x: [0.4], y: [0] } },
-          { t: DUR, s: [rotEnd] },
+          { t: driftFrame, s: [rotMid], i: { x: [0.3], y: [1] }, o: { x: [0.4], y: [0] } },
+          { t: endFrame, s: [rotEnd] },
         ],
       },
       o: {
@@ -205,17 +218,17 @@ const buildConfetti = () => {
         k: [
           { t: startFrame, s: [0], h: 1 },
           { t: startFrame + 1, s: [100], i: { x: [0.2], y: [1] }, o: { x: [0.4], y: [0] } },
-          { t: Math.max(midFrame, DUR - 8), s: [100], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
-          { t: DUR, s: [0] },
+          { t: Math.max(driftFrame + 4, DUR - 10), s: [100], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
+          { t: endFrame, s: [0] },
         ],
       },
       a: { a: 0, k: [0, 0, 0] },
       s: {
         a: 1,
         k: [
-          { t: startFrame, s: [70 + rng() * 20, 70 + rng() * 20, 100] },
-          { t: midFrame, s: [105 + rng() * 16, 105 + rng() * 16, 100] },
-          { t: DUR, s: [88 + rng() * 12, 88 + rng() * 12, 100] },
+          { t: startFrame, s: [72 + rng() * 18, 72 + rng() * 18, 100] },
+          { t: driftFrame, s: [106 + rng() * 18, 106 + rng() * 18, 100] },
+          { t: endFrame, s: [90 + rng() * 12, 90 + rng() * 12, 100] },
         ],
       },
     };
@@ -238,10 +251,10 @@ const buildConfetti = () => {
 
 // ---- Mascot bounce ----
 const buildMascotBounce = () => {
-  const W = 200;
-  const H = 200;
+  const W = 500;
+  const H = 500;
   const FR = 30;
-  const DUR = 30; // 1.0s
+  const DUR = 34; // 1.13s
   const tail = pathShape(
     quadToVerts([36, 132], [
       { cp: [18, 126], end: [16, 150] },
@@ -421,33 +434,43 @@ const buildMascotBounce = () => {
     p: {
       a: 1,
       k: [
-        { t: 0, s: [0, 0, 0], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.4, 0.4, 0.4], y: [0, 0, 0] } },
-        { t: 6, s: [0, 4, 0], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.2, 0.2, 0.2], y: [0, 0, 0] } },
-        { t: 14, s: [0, -34, 0], i: { x: [0.75, 0.75, 0.75], y: [1, 1, 1] }, o: { x: [0.55, 0.55, 0.55], y: [0, 0, 0] } },
-        { t: 22, s: [0, 2, 0], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.4, 0.4, 0.4], y: [0, 0, 0] } },
-        { t: 30, s: [0, 0, 0] },
+        { t: 0, s: [142, 164, 0], i: { x: [0.3, 0.3, 0.3], y: [1, 1, 1] }, o: { x: [0.28, 0.28, 0.28], y: [0, 0, 0] } },
+        { t: 2, s: [142, 132, 0], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.2, 0.2, 0.2], y: [0, 0, 0] } },
+        { t: 12, s: [142, 84, 0], i: { x: [0.76, 0.76, 0.76], y: [1, 1, 1] }, o: { x: [0.56, 0.56, 0.56], y: [0, 0, 0] } },
+        { t: 22, s: [142, 136, 0], i: { x: [0.34, 0.34, 0.34], y: [1, 1, 1] }, o: { x: [0.34, 0.34, 0.34], y: [0, 0, 0] } },
+        { t: 28, s: [142, 126, 0], i: { x: [0.35, 0.35, 0.35], y: [1, 1, 1] }, o: { x: [0.35, 0.35, 0.35], y: [0, 0, 0] } },
+        { t: 34, s: [142, 126, 0] },
       ],
     },
     s: {
       a: 1,
       k: [
-        { t: 0, s: [100, 100, 100], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.4, 0.4, 0.4], y: [0, 0, 0] } },
-        { t: 6, s: [108, 90, 100], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.4, 0.4, 0.4], y: [0, 0, 0] } },
-        { t: 14, s: [93, 107, 100], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.4, 0.4, 0.4], y: [0, 0, 0] } },
-        { t: 22, s: [103, 95, 100], i: { x: [0.4, 0.4, 0.4], y: [1, 1, 1] }, o: { x: [0.4, 0.4, 0.4], y: [0, 0, 0] } },
-        { t: 30, s: [100, 100, 100] },
+        { t: 0, s: [120, 120, 100], i: { x: [0.32, 0.32, 0.32], y: [1, 1, 1] }, o: { x: [0.32, 0.32, 0.32], y: [0, 0, 0] } },
+        { t: 2, s: [110, 92, 100], i: { x: [0.42, 0.42, 0.42], y: [1, 1, 1] }, o: { x: [0.42, 0.42, 0.42], y: [0, 0, 0] } },
+        { t: 12, s: [124, 124, 100], i: { x: [0.42, 0.42, 0.42], y: [1, 1, 1] }, o: { x: [0.42, 0.42, 0.42], y: [0, 0, 0] } },
+        { t: 22, s: [116, 90, 100], i: { x: [0.42, 0.42, 0.42], y: [1, 1, 1] }, o: { x: [0.42, 0.42, 0.42], y: [0, 0, 0] } },
+        { t: 28, s: [120, 120, 100], i: { x: [0.42, 0.42, 0.42], y: [1, 1, 1] }, o: { x: [0.42, 0.42, 0.42], y: [0, 0, 0] } },
+        { t: 34, s: [120, 120, 100] },
       ],
     },
     r: {
       a: 1,
       k: [
-        { t: 0, s: [0], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
-        { t: 10, s: [-1.5], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
-        { t: 18, s: [1.2], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
-        { t: 30, s: [0] },
+        { t: 0, s: [8], i: { x: [0.34], y: [1] }, o: { x: [0.34], y: [0] } },
+        { t: 12, s: [-4], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
+        { t: 22, s: [2], i: { x: [0.4], y: [1] }, o: { x: [0.4], y: [0] } },
+        { t: 34, s: [0] },
       ],
     },
-    o: { a: 0, k: 100 },
+    o: {
+      a: 1,
+      k: [
+        { t: 0, s: [0], h: 1 },
+        { t: 2, s: [100], i: { x: [0.2], y: [1] }, o: { x: [0.4], y: [0] } },
+        { t: 30, s: [100], i: { x: [0.3], y: [1] }, o: { x: [0.4], y: [0] } },
+        { t: 34, s: [0] },
+      ],
+    },
   };
 
   const shadowLayer = shapeLayerBase(
@@ -458,30 +481,81 @@ const buildMascotBounce = () => {
     {
       ind: 1,
       a: { a: 0, k: [108, 191, 0] },
-      p: { a: 0, k: [0, 0, 0] },
+      p: { a: 0, k: [142, 126, 0] },
       r: { a: 0, k: 0 },
       o: {
         a: 1,
         k: [
-          { t: 0, s: [22] },
-          { t: 14, s: [10] },
-          { t: 30, s: [20] },
+          { t: 0, s: [0], h: 1 },
+          { t: 2, s: [20] },
+          { t: 12, s: [8] },
+          { t: 22, s: [22] },
+          { t: 34, s: [0] },
         ],
       },
       s: {
         a: 1,
         k: [
-          { t: 0, s: [100, 100, 100] },
-          { t: 6, s: [108, 90, 100] },
-          { t: 14, s: [62, 70, 100] },
-          { t: 22, s: [112, 92, 100] },
-          { t: 30, s: [100, 100, 100] },
+          { t: 0, s: [66, 66, 100] },
+          { t: 2, s: [122, 74, 100] },
+          { t: 12, s: [66, 44, 100] },
+          { t: 22, s: [136, 76, 100] },
+          { t: 28, s: [118, 70, 100] },
+          { t: 34, s: [96, 60, 100] },
         ],
       },
     }
   );
 
   const bodyLayer = shapeLayerBase('mascot', 0, DUR, shapes, bodyTransform);
+  const sparkleBase = (ind, name, x, y, start, peak) =>
+    shapeLayerBase(
+      name,
+      0,
+      DUR,
+      [group(name, [starShape(0, 0, 10, 4.5, 4), fl('#FFE6C9', 100)])],
+      {
+        ind,
+        a: { a: 0, k: [0, 0, 0] },
+        p: {
+          a: 1,
+          k: [
+            { t: 0, s: [x, y + 8, 0] },
+            { t: peak, s: [x, y, 0] },
+            { t: 20, s: [x, y - 10, 0] },
+            { t: DUR, s: [x, y - 14, 0] },
+          ],
+        },
+        s: {
+          a: 1,
+          k: [
+            { t: 0, s: [40, 40, 100] },
+            { t: peak, s: [118, 118, 100] },
+            { t: 20, s: [84, 84, 100] },
+            { t: DUR, s: [52, 52, 100] },
+          ],
+        },
+        r: {
+          a: 1,
+          k: [
+            { t: 0, s: [0] },
+            { t: peak, s: [28 + ind * 8] },
+            { t: 20, s: [72 + ind * 10] },
+            { t: DUR, s: [92 + ind * 12] },
+          ],
+        },
+        o: {
+          a: 1,
+          k: [
+            { t: 0, s: [0], h: 1 },
+            { t: start, s: [0], h: 1 },
+            { t: start + 1, s: [100] },
+            { t: 18, s: [100] },
+            { t: 24, s: [0] },
+          ],
+        },
+      }
+    );
 
   return {
     v: '5.7.0',
@@ -493,7 +567,13 @@ const buildMascotBounce = () => {
     nm: 'mascot-bounce',
     ddd: 0,
     assets: [],
-    layers: [shadowLayer, bodyLayer],
+    layers: [
+      shadowLayer,
+      bodyLayer,
+      sparkleBase(3, 'sparkle-left', 210, 150, 10, 13),
+      sparkleBase(4, 'sparkle-top', 272, 126, 11, 14),
+      sparkleBase(5, 'sparkle-right', 316, 166, 12, 15),
+    ],
   };
 };
 
