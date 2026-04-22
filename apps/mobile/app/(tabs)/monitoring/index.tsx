@@ -1,6 +1,9 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { Mascot, MonitoringMetaChip, MonitoringStageBadge, ScreenHeader, resolveMonitoringStageTone, PressableScale } from '../../../src/components';
 import { apiRequest, toApiErrorMessage } from '../../../src/lib/api';
 import { useApi } from '../../../src/lib/use-api';
@@ -15,7 +18,7 @@ import {
 import { useEntitlement } from '../../../src/session/entitlement-context';
 import { useSession } from '../../../src/session/session-context';
 import { KeyboardAwareScrollView } from '../../../src/ui/KeyboardAwareScrollView';
-import { colors, spacing, typography } from '../../../src/ui/theme';
+import { colors, gradients, radii, shadow, spacing, typography } from '../../../src/ui/theme';
 
 interface SubscriptionCopy {
   planName: string;
@@ -239,14 +242,23 @@ export default function MonitoringTabScreen() {
     return (
       <KeyboardAwareScrollView contentContainerStyle={styles.container}>
         <ScreenHeader title="みまもり" />
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>大切な人を、もう少しちゃんと見守る。</Text>
-          <Text style={styles.heroText}>
-            見守りプランにご加入いただくと、離れた家族の「今日いる」をやさしく確認できます。
-          </Text>
-        </View>
+        <LinearGradient
+          colors={[...gradients.heroPremium]}
+          end={{ x: 1, y: 1 }}
+          start={{ x: 0, y: 0 }}
+          style={styles.paywallHero}
+        >
+          <View style={styles.paywallHeroContent}>
+            <Mascot size={100} variant="cheer" />
+            <Text style={styles.paywallHeroTitle}>大切な人を、もう少しちゃんと見守る。</Text>
+            <Text style={styles.paywallHeroText}>
+              見守りプランにご加入いただくと、離れた家族の「今日いる」をやさしく確認できます。
+            </Text>
+          </View>
+        </LinearGradient>
 
         <View style={styles.card}>
+          <View style={styles.paywallCardAccent} />
           <Text style={styles.paywallTitle}>見守りプラン</Text>
           <View style={styles.paywallPriceRow}>
             <Text style={styles.paywallPrice}>
@@ -256,25 +268,32 @@ export default function MonitoringTabScreen() {
               {subscriptionCopy?.billingCycle ?? '/ 月'}
             </Text>
           </View>
-          <Text style={styles.metaText}>
-            {subscriptionCopy?.freeTrial ?? '初回 7 日間は無料。いつでも解約できます。'}
-          </Text>
+          <View style={styles.trialBadge}>
+            <Text style={styles.trialBadgeText}>
+              {subscriptionCopy?.freeTrial ?? '初回 7 日間無料'}
+            </Text>
+          </View>
           <View style={styles.paywallBulletList}>
-            {planHighlights.map((item) => (
-              <View key={item} style={styles.paywallBulletRow}>
+            {planHighlights.map((item, index) => (
+              <Animated.View
+                entering={FadeInUp.delay(index * 80).duration(300)}
+                key={item}
+                style={styles.paywallBulletRow}
+              >
                 <View style={styles.paywallBulletDot} />
                 <Text style={styles.paywallBulletText}>{item}</Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
           <PressableScale
             hapticStyle="medium"
-            style={styles.primaryButton}
+            style={styles.ctaButton}
             onPress={() => {
               router.push('/(tabs)/settings/subscription-info' as never);
             }}
           >
-            <Text style={styles.primaryButtonLabel}>7 日間無料で試す</Text>
+            <Text style={styles.ctaButtonLabel}>7 日間無料で試す</Text>
+            <Ionicons color={colors.onDark} name="chevron-forward" size={18} />
           </PressableScale>
           <Text style={styles.paywallFinePrint}>
             監視ではなく、反応がない時に気づきやすくするための機能です。
@@ -557,6 +576,26 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.onSkyMuted,
   },
+  paywallHero: {
+    borderRadius: radii.xl,
+    ...shadow.pop,
+  },
+  paywallHeroContent: {
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing['2xl'],
+  },
+  paywallHeroTitle: {
+    ...typography.display,
+    color: colors.onDark,
+    textAlign: 'center',
+  },
+  paywallHeroText: {
+    ...typography.body,
+    color: colors.onDark,
+    textAlign: 'center',
+  },
   card: {
     padding: 18,
     borderRadius: 20,
@@ -585,20 +624,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
   },
+  paywallCardAccent: {
+    height: 2,
+    marginHorizontal: -18,
+    marginTop: -18,
+    borderRadius: radii.pill,
+    backgroundColor: colors.liveGreen,
+  },
   paywallPriceRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 6,
   },
   paywallPrice: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...typography.display,
     color: colors.ink,
   },
   paywallCycle: {
     fontSize: 14,
     color: colors.muted,
     marginBottom: 4,
+  },
+  trialBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.liveGreenTint,
+  },
+  trialBadgeText: {
+    ...typography.caption,
+    color: colors.liveGreen,
+    fontWeight: '700',
   },
   paywallBulletList: {
     gap: 8,
@@ -613,7 +670,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 999,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.liveGreen,
     marginTop: 8,
   },
   paywallBulletText: {
@@ -698,6 +755,22 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: 'center',
     color: colors.hint,
+    marginTop: spacing.xs,
+  },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+    ...shadow.card,
+  },
+  ctaButtonLabel: {
+    ...typography.subtitle,
+    color: colors.onDark,
   },
   buttonDisabled: {
     opacity: 0.7,

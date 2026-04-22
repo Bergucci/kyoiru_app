@@ -1,24 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
-  <defs>
-    <radialGradient id="bodyL" cx="40%" cy="35%" r="85%">
-      <stop offset="0%" stop-color="#FFD3A8"/>
-      <stop offset="60%" stop-color="#FFA978"/>
-      <stop offset="100%" stop-color="#EE8A57"/>
-    </radialGradient>
-  </defs>
-  <path d="M64 208 L102 176 L104 236 Z" fill="#E2814E"/>
-  <path d="M60 160 Q94 128 150 146 Q182 182 154 234 Q98 250 60 202 Z" fill="#E89366" opacity="0.5"/>
-  <ellipse cx="168" cy="182" rx="98" ry="88" fill="url(#bodyL)"/>
-  <path d="M108 178 Q138 134 214 148 Q242 198 174 248 Q116 244 108 178 Z" fill="#E89366" opacity="0.84"/>
-  <path d="M174 154 Q214 126 270 146 Q298 186 270 238 Q214 252 174 206 Z" fill="#E89366" opacity="0.82"/>
-  <path d="M246 186 L284 202 L246 220 Z" fill="#FFB04A"/>
-  <path d="M182 148 L208 148" fill="none" stroke="#3A2418" stroke-width="7" stroke-linecap="round"/>
-  <path d="M228 148 L254 148" fill="none" stroke="#3A2418" stroke-width="7" stroke-linecap="round"/>
-  <path d="M212 190 Q222 194 232 190" fill="none" stroke="#8B4E2E" stroke-width="5" stroke-linecap="round"/>
-  <g stroke="#C46A3E" stroke-width="5" stroke-linecap="round">
-    <line x1="132" y1="266" x2="132" y2="284"/>
-    <line x1="184" y1="266" x2="184" y2="284"/>
+  <image href="base.png" width="320" height="320" preserveAspectRatio="xMidYMid meet"/>
+  <g>
+    <ellipse cx="184" cy="132" rx="24" ry="16" fill="#15695C"/>
+    <ellipse cx="228" cy="122" rx="21" ry="15" fill="#228073"/>
+    <path d="M170 136 Q184 132 198 136" fill="none" stroke="#2E221E" stroke-width="7" stroke-linecap="round"/>
+    <path d="M214 126 Q227 122 240 126" fill="none" stroke="#2E221E" stroke-width="7" stroke-linecap="round"/>
+    <path d="M200 202 Q212 208 226 202" fill="none" stroke="#9B572A" stroke-width="7" stroke-linecap="round"/>
+    <text x="264" y="72" fill="#C69A74" font-size="26" font-weight="700">Z</text>
+    <text x="286" y="50" fill="#A07458" font-size="18" font-weight="700">Z</text>
   </g>
-  <text x="262" y="96" fill="#A07458" font-size="22" font-weight="700">Z</text>
-  <text x="282" y="72" fill="#A07458" font-size="16" font-weight="700">Z</text>
 </svg>

@@ -1,8 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Card, Mascot, PressableScale, ScreenHeader } from '../../../src/components';
 import { useSession } from '../../../src/session/session-context';
 import { resolveMediaUrl } from '../../../src/lib/api';
@@ -41,6 +42,8 @@ const supportMenuItems = [
 function getInitial(value: string | null | undefined) {
   return (value?.trim().charAt(0) || '今').toUpperCase();
 }
+
+const ONBOARDING_STORAGE_KEY = 'kyoiru.onboardingCompleted';
 
 export default function SettingsIndexScreen() {
   const router = useRouter();
@@ -152,6 +155,18 @@ export default function SettingsIndexScreen() {
         <Mascot size={80} variant="happy" />
         <Text style={styles.footerNote}>今日もありがとう</Text>
         <Text style={styles.version}>v{appVersion}</Text>
+        {__DEV__ ? (
+          <PressableScale
+            hapticStyle="light"
+            onPress={async () => {
+              await AsyncStorage.removeItem(ONBOARDING_STORAGE_KEY);
+              Alert.alert('dev', 'onboarding reset');
+            }}
+            style={styles.debugButton}
+          >
+            <Text style={styles.debugButtonLabel}>[dev] reset onboarding</Text>
+          </PressableScale>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -266,5 +281,15 @@ const styles = StyleSheet.create({
   version: {
     ...typography.caption,
     color: colors.hint,
+  },
+  debugButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.secondarySurface,
+  },
+  debugButtonLabel: {
+    ...typography.caption,
+    color: colors.muted,
   },
 });
